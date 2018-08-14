@@ -23,7 +23,7 @@ export class GameTableSettingComponent implements OnInit, OnDestroy, AfterViewIn
   get tableBackgroundImage(): ImageFile {
     if (!this.selectedTable) return ImageFile.Empty;
     let file = ImageStorage.instance.get(this.selectedTable.imageIdentifier);
-    return file ? file : ImageFile.Empty;
+    return file ? file : ImageFile.Default;
   }
 
   get tableName(): string { return this.selectedTable.name; }

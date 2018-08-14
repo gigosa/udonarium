@@ -58,6 +58,14 @@ export class ImageFile {
     return imageFile;
   }
 
+  static createDefault(identifire: string): ImageFile {
+    let imageFile = new ImageFile();
+    imageFile.context.identifier = identifire;
+    imageFile.context.url = './assets/images/BG10a_80.jpg';
+
+    return imageFile;
+  }
+
   static create(url: string): ImageFile
   static create(context: ImageContext): ImageFile
   static create(arg: any): ImageFile {
@@ -187,6 +195,8 @@ export class ImageFile {
   }
 
   static Empty: ImageFile = ImageFile.createEmpty('null');
+
+  static Default: ImageFile = ImageFile.createDefault('default');
 }
 
 /**
