@@ -91,7 +91,6 @@ export class ChatPaletteComponent implements OnInit {
       this.text = line;
       let textArea: HTMLTextAreaElement = this.textAreaElementRef.nativeElement;
       textArea.value = this.text;
-      this.onInput();
       this.doubleClickTimer = setTimeout(() => { this.doubleClickTimer = null }, 400);
     }
   }
@@ -141,10 +140,12 @@ export class ChatPaletteComponent implements OnInit {
     });
   }
 
-  sendChat(event: Event) {
+  sendChat(event: KeyboardEvent) {
     if (event) event.preventDefault();
 
     if (!this.text.length) return;
+
+    if (event && event.keyCode !== 13) return;
 
     let time = this.chatMessageService.getTime();
     console.log('time:' + time);
