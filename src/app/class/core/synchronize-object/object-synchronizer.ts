@@ -63,10 +63,7 @@ export class ObjectSynchronizer {
       })
       .on('DELETE_GAME_OBJECT', 0, event => {
         let context: ObjectContext = event.data;
-        let object = ObjectStore.instance.get(context.identifier);
-        if (object !== null) {
-          ObjectStore.instance.delete(object, false);
-        }
+        ObjectStore.instance.delete(context.identifier, false);
       });
   }
 
@@ -99,7 +96,7 @@ export class ObjectSynchronizer {
   private sendCatalog(sendTo: string) {
     let catalog = ObjectStore.instance.getCatalog();
     let interval = setInterval(() => {
-      let count = catalog.length < 1024 ? catalog.length : 1024;
+      let count = catalog.length < 2048 ? catalog.length : 2048;
       EventSystem.call('SYNCHRONIZE_GAME_OBJECT', catalog.splice(0, count), sendTo);
       if (catalog.length < 1) clearInterval(interval);
     });
@@ -119,8 +116,10 @@ export class ObjectSynchronizer {
   }
 
   private synchronize() {
-    if (this.requestMap.size < 1 || 0 < this.tasks.length) return;
+    while (0 < this.requestMap.size && this.tasks.length < 32) this.runSynchronizeTask();
+  }
 
+  private runSynchronizeTask() {
     let requests: SynchronizeRequest[] = this.makeRequestList();
 
     if (requests.length < 1) return;
@@ -138,7 +137,7 @@ export class ObjectSynchronizer {
     }
   }
 
-  private makeRequestList(maxRequest: number = 512): SynchronizeRequest[] {
+  private makeRequestList(maxRequest: number = 32): SynchronizeRequest[] {
     let entries = this.requestMap.entries();
     let requests: SynchronizeRequest[] = [];
 

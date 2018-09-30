@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, NgZone, OnDestroy, ViewChild, ViewContainerRef } from '@angular/core';
+import { AfterViewInit, Component, NgZone, OnDestroy, ViewChild, ViewContainerRef, ElementRef } from '@angular/core';
 
 import { ChatTab } from './class/chat-tab';
 import { AudioSharingSystem } from './class/core/file-storage/audio-sharing-system';
@@ -42,6 +42,7 @@ import { SoundEffect, PresetSound } from './class/sound-effect';
 export class AppComponent implements AfterViewInit, OnDestroy {
 
   @ViewChild('modalLayer', { read: ViewContainerRef }) modalLayerViewContainerRef: ViewContainerRef;
+  @ViewChild('networkIndicator') networkIndicatorElementRef: ElementRef;
   private lazyUpdateTimer: NodeJS.Timer = null;
   private openPanelCount: number = 0;
 
@@ -121,23 +122,37 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     PeerCursor.myCursor.name = 'プレイヤー';
     PeerCursor.myCursor.imageIdentifier = noneIconImage.identifier;
 
+    let timer = null;
+    let needRepeat = false;
+    let func = () => {
+      if (needRepeat) {
+        timer = setTimeout(func, 650);
+        needRepeat = false;
+      } else {
+        timer = null;
+        this.networkIndicatorElementRef.nativeElement.style.display = 'none';
+      }
+    };
     EventSystem.register(this)
       .on('*', event => {
-        if (!event.isSendFromSelf && this.lazyUpdateTimer === null) {
-          this.lazyUpdateTimer = setTimeout(() => {
-            this.lazyUpdateTimer = null;
-            this.ngZone.run(() => { });
-          }, 100);
+        if (needRepeat || Network.bandwidthUsage < 3 * 1024) return;
+        if (timer === null) {
+          this.networkIndicatorElementRef.nativeElement.style.display = 'block';
+          timer = setTimeout(func, 650);
+        } else {
+          needRepeat = true;
         }
-      }).on<AppConfig>('LOAD_CONFIG', 0, event => {
+      })
+      .on('UPDATE_GAME_OBJECT', event => { this.lazyNgZoneUpdate(); })
+      .on('DELETE_GAME_OBJECT', event => { this.lazyNgZoneUpdate(); })
+      .on('SYNCHRONIZE_AUDIO_LIST', event => { if (event.isSendFromSelf) this.lazyNgZoneUpdate(); })
+      .on('SYNCHRONIZE_FILE_LIST', event => { if (event.isSendFromSelf) this.lazyNgZoneUpdate(); })
+      .on<AppConfig>('LOAD_CONFIG', 0, event => {
         console.log('LOAD_CONFIG !!!', event.data);
         Network.setApiKey(event.data.webrtc.key);
         Network.open();
-      }).on<AppConfig>('FILE_LOADED', 0, event => {
-        this.lazyUpdateTimer = setTimeout(() => {
-          this.lazyUpdateTimer = null;
-          this.ngZone.run(() => { });
-        }, 100);
+      }).on<File>('FILE_LOADED', 0, event => {
+        this.lazyNgZoneUpdate();
       })
       .on('OPEN_PEER', 0, event => {
         console.log('OPEN_PEER', event.data.peer);
@@ -150,7 +165,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
           if (1 < Network.peerIds.length) {
             await this.modalService.open(TextViewComponent, { title: 'ネットワークエラー', text: 'ネットワーク接続に何らかの異常が発生しました。\nこの表示以後、接続が不安定であれば、ページリロードと再接続を試みてください。' });
           } else {
-            await this.modalService.open(TextViewComponent, { title: 'ネットワークエラー', text: 'Peer情報が破棄されました。\nこのウィンドウを閉じると再接続を試みます。' });
+            await this.modalService.open(TextViewComponent, { title: 'ネットワークエラー', text: '接続情報が破棄されました。\nこのウィンドウを閉じると再接続を試みます。' });
             Network.open();
           }
         });
@@ -214,5 +229,13 @@ export class AppComponent implements AfterViewInit, OnDestroy {
       ? Network.peerContext.roomName
       : 'ルームデータ';
     this.saveDataService.saveRoom(roomName);
+  }
+
+  private lazyNgZoneUpdate() {
+    if (this.lazyUpdateTimer !== null) return;
+    this.lazyUpdateTimer = setTimeout(() => {
+      this.lazyUpdateTimer = null;
+      this.ngZone.run(() => { });
+    }, 100);
   }
 }

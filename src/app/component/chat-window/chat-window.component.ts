@@ -138,14 +138,14 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
       })
       .on<string>('WRITING_A_MESSAGE', event => {
         if (event.isSendFromSelf || event.data !== this.chatTabidentifier) return;
-        if (this.writingPeers.has(event.sendFrom)) clearTimeout(this.writingPeers.get(event.sendFrom));
-        this.writingPeers.set(event.sendFrom, setTimeout(() => {
-          this.ngZone.run(() => {
+        this.ngZone.run(() => {
+          if (this.writingPeers.has(event.sendFrom)) clearTimeout(this.writingPeers.get(event.sendFrom));
+          this.writingPeers.set(event.sendFrom, setTimeout(() => {
             this.writingPeers.delete(event.sendFrom);
             this.updateWritingPeerNames();
-          });
-        }, 2000));
-        this.updateWritingPeerNames();
+          }, 2000));
+          this.updateWritingPeerNames();
+        });
       });
     this.updatePanelTitle();
   }
@@ -306,7 +306,14 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
     console.log(chatMessage);
 
     //this.eventSystem.call('BROADCAST_MESSAGE', chatMessage);
-    if (this.chatTab) this.chatTab.addMessage(chatMessage);
+    if (this.chatTab) {
+      let latestTimeStamp: number = 0 < this.chatTab.chatMessages.length
+        ? this.chatTab.chatMessages[this.chatTab.chatMessages.length - 1].timestamp
+        : chatMessage.timestamp;
+      if (chatMessage.timestamp <= latestTimeStamp) chatMessage.timestamp = latestTimeStamp + 1;
+
+      this.chatTab.addMessage(chatMessage);
+    }
     //this.scrollToBottom(true);
     this.text = '';
     this.previousWritingLength = this.text.length;
@@ -364,5 +371,9 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
         }
         return true;
     }
+  }
+
+  trackByChatTab(index: number, chatTab: ChatTab) {
+    return chatTab.identifier;
   }
 }

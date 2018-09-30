@@ -1,6 +1,7 @@
 import { Connection, ConnectionCallback } from './connection';
 import { SkyWayConnection } from './skyway-connection';
 import { IPeerContext } from './peer-context';
+import { setZeroTimeout } from '../util/zero-timeout';
 
 export class Network {
   private static _instance: Network
@@ -18,12 +19,13 @@ export class Network {
   get isConnected(): boolean { return this.connection && this.connection.peerContext ? this.connection.peerContext.isOpen : false; }
 
   readonly callback: ConnectionCallback = new ConnectionCallback();
+  get bandwidthUsage(): number { return this.connection ? this.connection.bandwidthUsage : 0; }
 
   private key: string = '';
   private connection: Connection;
 
   private queue: any[] = [];
-  private sendInterval: NodeJS.Timer = null;
+  private sendInterval: number = null;
   private sendCallback = () => { this.sendQueue(); }
   private callbackUnload: any = (e) => { this.close(); };
 
@@ -69,26 +71,26 @@ export class Network {
   send(data: any) {
     this.queue.push(data);
     if (this.sendInterval === null) {
-      this.sendInterval = setInterval(this.sendCallback, 0);
+      this.sendInterval = setZeroTimeout(this.sendCallback);
     }
   }
 
   private sendQueue() {
     let broadcast: any[] = [];
     let unicast: { [sendTo: string]: any[] } = {};
+    let echocast: any[] = [];
 
-    let loop = this.queue.length < 2048 ? this.queue.length : 2048;
+    let loop = this.queue.length < 128 ? this.queue.length : 128;
     //console.warn(this.queue.length);
     for (let i = 0; i < loop; i++) {
       let event = this.queue[i];
       if (event.sendTo == null) {
-        if (this.callback.onData) this.callback.onData(event.sendTo, [event]);
-        broadcast[broadcast.length] = event;
+        broadcast.push(event);
       } else if (event.sendTo === this.peerId) {
-        if (this.callback.onData) this.callback.onData(event.sendTo, [event]);
+        echocast.push(event);
       } else {
         if (!(event.sendTo in unicast)) unicast[event.sendTo] = [];
-        unicast[event.sendTo][unicast[event.sendTo].length] = event;
+        unicast[event.sendTo].push(event);
       }
     }
     this.queue.splice(0, loop);
@@ -98,8 +100,15 @@ export class Network {
       for (let sendTo in unicast) this.connection.send(unicast[sendTo], sendTo);
     }
 
-    if (this.queue.length < 1) {
-      clearInterval(this.sendInterval);
+    // 自分自身への送信
+    if (this.callback.onData) {
+      this.callback.onData(null, broadcast);
+      this.callback.onData(this.peerId, echocast);
+    }
+
+    if (0 < this.queue.length) {
+      this.sendInterval = setZeroTimeout(this.sendCallback);
+    } else {
       this.sendInterval = null;
     }
   }
@@ -125,7 +134,7 @@ export class Network {
     store.callback.onError = (peerId, err) => { if (this.callback.onError) this.callback.onError(peerId, err); }
     store.callback.onDetectUnknownPeers = (peerIds) => { if (this.callback.onDetectUnknownPeers) this.callback.onDetectUnknownPeers(peerIds); }
 
-    if (0 < this.queue.length && this.sendInterval === null) { this.sendInterval = setTimeout(this.sendCallback, 0); }
+    if (0 < this.queue.length && this.sendInterval === null) this.sendInterval = setZeroTimeout(this.sendCallback);
 
     return store;
   }

@@ -23,6 +23,7 @@ import { GameTableSettingComponent } from '../game-table-setting/game-table-sett
 import { TextNote } from '../../class/text-note';
 import { TabletopService, } from '../../service/tabletop.service';
 import { SoundEffect, PresetSound } from '../../class/sound-effect';
+import { GameObject } from '../../class/core/synchronize-object/game-object';
 
 @Component({
   selector: 'game-table',
@@ -119,8 +120,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
         this.setGameTableGrid(this.gameTableObject.width, this.gameTableObject.height, this.gameTableObject.gridSize, this.gameTableObject.gridType, this.gameTableObject.gridColor);
       })
       .on('DELETE_GAME_OBJECT', 1000, event => {
-        let object = ObjectStore.instance.get(event.data.identifier);
-        let garbage = object ? object : ObjectStore.instance.getDeletedObject(event.data.identifier);
+        let garbage = ObjectStore.instance.get(event.data.identifier);
         if (garbage == null || garbage.aliasName.length < 1) {
           this.resetUpdateList();
         } else if (this.needUpdateList[garbage.aliasName] === true) {
@@ -613,6 +613,10 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     document.body.removeEventListener('mouseup', this.callbackOnMouseUp, false);
     document.body.removeEventListener('mousemove', this.callbackOnMouseMove, true);
     document.body.removeEventListener('touchmove', this.callbackOnMouseMove, true);
+  }
+
+  trackByGameObject(index: number, gameObject: GameObject) {
+    return gameObject.identifier;
   }
 
   private makeDefaultTable() {
