@@ -1,20 +1,23 @@
 import { EventSystem } from '../system/system';
-import { AudioFile, AudioFileContext, AudioState } from './audio-file';
+import { AudioFile } from './audio-file';
 import { FileReaderUtil } from './file-reader-util';
 
 interface ChankData {
   index: number;
   length: number;
-  chank: Blob;
+  chank: ArrayBuffer;
 }
 
 // 試験実装中
 export class AudioSharingTask {
   private file: AudioFile;
   private sendTo: string = '';
-  private chanks: Blob[] = [];
+  private chanks: ArrayBuffer[] = [];
   private chankSize: number = 14 * 1024;
   private sendChankTimer: NodeJS.Timer;
+
+  private sentChankLength = 0;
+  private completedChankLength = 0;
 
   get identifier(): string { return this.file.identifier; }
 
@@ -47,38 +50,59 @@ export class AudioSharingTask {
     this.onfinish = this.ontimeout = null;
   }
 
-  private initializeSend() {
+  private async initializeSend() {
     let offset = 0;
-    while (offset < this.file.blob.size) {
-      let chank: Blob = null;
-      if (offset + this.chankSize < this.file.blob.size) {
-        chank = this.file.blob.slice(offset, offset + this.chankSize);
+    let arrayBuffer = await FileReaderUtil.readAsArrayBufferAsync(this.file.blob);
+    let byteLength = arrayBuffer.byteLength;
+    while (offset < byteLength) {
+      let chank: ArrayBuffer = null;
+      if (offset + this.chankSize < byteLength) {
+        chank = arrayBuffer.slice(offset, offset + this.chankSize);
       } else {
-        chank = this.file.blob.slice(offset, this.file.blob.size);
+        chank = arrayBuffer.slice(offset, byteLength);
       }
       this.chanks.push(chank);
       offset += this.chankSize;
     }
-    let blob = new Blob(this.chanks, { type: this.file.blob.type });
-    console.warn('ファイル末尾 ', this.chanks);
+    console.log('チャンク分割 ' + this.file.identifier, this.chanks.length);
+
+    EventSystem.register(this)
+      .on<number>('FILE_MORE_CHANK_' + this.file.identifier, 0, event => {
+        if (this.sendTo !== event.sendFrom) return;
+        this.completedChankLength = event.data;
+        if (this.sendChankTimer == null) {
+          clearTimeout(this.timeoutTimer);
+          this.sendChank(this.sentChankLength);
+        }
+      })
+      .on('CLOSE_OTHER_PEER', 0, event => {
+        if (event.data.peer !== this.sendTo) return;
+        console.warn('送信キャンセル', this, event.data.peer);
+        if (this.ontimeout) this.ontimeout(this);
+        if (this.onfinish) this.onfinish(this);
+        this.cancel();
+      });
+
+    this.sentChankLength = this.completedChankLength = 0;
     this.sendChank(0);
   }
 
   private sendChank(index: number) {
     this.sendChankTimer = setTimeout(async () => {
       let data = { index: index, length: this.chanks.length, chank: this.chanks[index] };
-
-      /* hotfix issue #1 */
-      data.chank = <any>await FileReaderUtil.readAsArrayBufferAsync(data.chank);
-      /* */
-
       EventSystem.call('FILE_SEND_CHANK_' + this.file.identifier, data, this.sendTo);
-      if (index + 1 < this.chanks.length) {
+      this.sentChankLength = index;
+      if (this.completedChankLength + 16 <= index + 1) {
+        console.log('waitSendChank... ', this.completedChankLength);
+        this.sendChankTimer = null;
+        this.setTimeout();
+      } else if (index + 1 < this.chanks.length) {
         this.sendChank(index + 1);
       } else {
         EventSystem.call('FILE_SEND_END_' + this.file.identifier, { type: this.file.blob.type }, this.sendTo);
         console.warn('ファイル送信完了', this.file);
         if (this.onfinish) this.onfinish(this);
+        this.cancel();
       }
     }, 0);
   }
@@ -95,6 +119,9 @@ export class AudioSharingTask {
         /* */
 
         this.setTimeout();
+        if ((event.data.index + 1) % 8 === 0) {
+          EventSystem.call('FILE_MORE_CHANK_' + this.file.identifier, event.data.index + 1, event.sendFrom);
+        }
       }).on('FILE_SEND_END_' + this.file.identifier, 0, event => {
         if (this.timeoutTimer) clearTimeout(this.timeoutTimer);
         EventSystem.unregister(this);
@@ -109,6 +136,8 @@ export class AudioSharingTask {
   private setTimeout() {
     clearTimeout(this.timeoutTimer);
     this.timeoutTimer = setTimeout(() => {
+      if (this.ontimeout) this.ontimeout(this);
+      if (this.onfinish) this.onfinish(this);
       this.cancel();
     }, 10 * 1000);
   }
