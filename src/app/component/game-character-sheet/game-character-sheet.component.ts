@@ -1,12 +1,8 @@
 import { AfterViewInit, Component, Input, OnDestroy, OnInit } from '@angular/core';
 
-import { Card } from '@udonarium/card';
-import { EventSystem, Network } from '@udonarium/core/system/system';
+import { EventSystem, Network } from '@udonarium/core/system';
 import { DataElement } from '@udonarium/data-element';
-import { DiceSymbol } from '@udonarium/dice-symbol';
-import { GameCharacter } from '@udonarium/game-character';
 import { TabletopObject } from '@udonarium/tabletop-object';
-import { Terrain } from '@udonarium/terrain';
 
 import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
 import { ModalService } from 'service/modal.service';
@@ -25,45 +21,17 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
 
   networkService = Network;
 
-  get isCharacter(): boolean {
-    return this.tabletopObject instanceof GameCharacter;
-  }
-
-  get isCard(): boolean {
-    return this.tabletopObject instanceof Card;
-  }
-
-  get isTerrain(): boolean {
-    return this.tabletopObject instanceof Terrain;
-  }
-
-  get isDiceSymbol(): boolean {
-    return this.tabletopObject instanceof DiceSymbol;
-  }
-
-  get isVisibleDice(): boolean {
-    return this.tabletopObject instanceof DiceSymbol && this.tabletopObject.isVisible;
-  }
-
-  get diceFace(): string {
-    return this.tabletopObject instanceof DiceSymbol && this.tabletopObject.face;
-  }
-
   constructor(
     private saveDataService: SaveDataService,
-    private modalService: ModalService,
-    private panelService: PanelService
+    private panelService: PanelService,
+    private modalService: ModalService
   ) { }
 
   ngOnInit() {
-    this.panelService.title = 'キャラクターシート';
-    if (this.tabletopObject instanceof GameCharacter && 0 < this.tabletopObject.name.length) {
-      this.panelService.title += ' - ' + this.tabletopObject.name;
-    }
     EventSystem.register(this)
       .on('DELETE_GAME_OBJECT', -1000, event => {
         if (this.tabletopObject && this.tabletopObject.identifier === event.data.identifier) {
-          this.tabletopObject = null;
+          this.panelService.close();
         }
       });
   }
@@ -102,8 +70,8 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
     this.tabletopObject.setLocation(locationName);
   }
 
-  openModal(name: string) {
-    this.modalService.open<string>(FileSelecterComponent).then(value => {
+  openModal(name: string = '', isAllowedEmpty: boolean = false) {
+    this.modalService.open<string>(FileSelecterComponent, { isAllowedEmpty: isAllowedEmpty }).then(value => {
       if (!this.tabletopObject || !this.tabletopObject.imageDataElement || !value) return;
       let element = this.tabletopObject.imageDataElement.getFirstElementByName(name);
       if (!element) return;

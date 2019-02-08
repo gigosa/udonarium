@@ -5,7 +5,7 @@ import { ChatPalette } from '@udonarium/chat-palette';
 import { ChatTab } from '@udonarium/chat-tab';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { PeerContext } from '@udonarium/core/system/network/peer-context';
-import { EventSystem, Network } from '@udonarium/core/system/system';
+import { EventSystem, Network } from '@udonarium/core/system';
 import { DiceBot } from '@udonarium/dice-bot';
 import { GameCharacter } from '@udonarium/game-character';
 import { PeerCursor } from '@udonarium/peer-cursor';
@@ -38,8 +38,6 @@ export class ChatPaletteComponent implements OnInit, OnDestroy {
 
   isEdit: boolean = false;
   editPalette: string = '';
-
-  get paletteSize(): number { return this.palette.getPalette().length > 2 ? this.palette.getPalette().length : 2; }
 
   private writingEventInterval: NodeJS.Timer = null;
   private previousWritingLength: number = 0;

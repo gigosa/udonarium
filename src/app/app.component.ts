@@ -13,7 +13,7 @@ import { ObjectFactory } from '@udonarium/core/synchronize-object/object-factory
 import { ObjectSerializer } from '@udonarium/core/synchronize-object/object-serializer';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { ObjectSynchronizer } from '@udonarium/core/synchronize-object/object-synchronizer';
-import { EventSystem, Network } from '@udonarium/core/system/system';
+import { EventSystem, Network } from '@udonarium/core/system';
 import { DataSummarySetting } from '@udonarium/data-summary-setting';
 import { DiceBot } from '@udonarium/dice-bot';
 import { Jukebox } from '@udonarium/Jukebox';
@@ -183,7 +183,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
         break;
       case 'GameTableSettingComponent':
         component = GameTableSettingComponent;
-        option = { width: 630, height: 350, left: 100 };
+        option = { width: 630, height: 400, left: 100 };
         break;
       case 'FileStorageComponent':
         component = FileStorageComponent;

@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, ChangeDetectorRef, Component, Input, OnDestroy
 
 import { Card } from '@udonarium/card';
 import { CardStack } from '@udonarium/card-stack';
-import { EventSystem, Network } from '@udonarium/core/system/system';
+import { EventSystem, Network } from '@udonarium/core/system';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 
 import { GameCharacterSheetComponent } from 'component/game-character-sheet/game-character-sheet.component';
@@ -84,12 +84,14 @@ export class CardStackListComponent implements OnInit, OnDestroy {
     this.panelService.close();
   }
 
-  private showDetail(gameObject: Card) {
+  showDetail(gameObject: Card) {
     let coordinate = {
       x: this.panelService.left,
       y: this.panelService.top
     };
-    let option: PanelOption = { left: coordinate.x + 10, top: coordinate.y + 20, width: 600, height: 600 };
+    let title = 'カード設定';
+    if (gameObject.name.length) title += ' - ' + gameObject.name;
+    let option: PanelOption = { title: title, left: coordinate.x + 10, top: coordinate.y + 20, width: 600, height: 600 };
     let component = this.panelService.open<GameCharacterSheetComponent>(GameCharacterSheetComponent, option);
     component.tabletopObject = gameObject;
   }

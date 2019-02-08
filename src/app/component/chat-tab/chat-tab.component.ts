@@ -6,6 +6,7 @@ import {
   Component,
   EventEmitter,
   Input,
+  NgZone,
   OnChanges,
   OnDestroy,
   OnInit,
@@ -14,7 +15,8 @@ import {
 
 import { ChatMessage, ChatMessageContext } from '@udonarium/chat-message';
 import { ChatTab } from '@udonarium/chat-tab';
-import { EventSystem } from '@udonarium/core/system/system';
+import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
+import { EventSystem } from '@udonarium/core/system';
 
 import { PanelService } from 'service/panel.service';
 
@@ -63,6 +65,7 @@ export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnCha
   @Output() onAddMessage: EventEmitter<null> = new EventEmitter();
 
   constructor(
+    private ngZone: NgZone,
     private changeDetector: ChangeDetectorRef,
     private panelService: PanelService
   ) { }
@@ -87,16 +90,20 @@ export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnCha
 
     EventSystem.register(this)
       .on('UPDATE_GAME_OBJECT', -1000, event => {
-        if (event.data.aliasName === ChatMessage.aliasName) {
+        let object = ObjectStore.instance.get(event.data.identifier);
+        if (object && object instanceof ChatMessage && object.parent === this.chatTab) {
           if (!this.needUpdate) this.changeDetector.markForCheck();
           this.needUpdate = true;
+          this.maxMessages += 1;
         }
       });
   }
 
   ngAfterViewInit() {
     setTimeout(() => {
-      this.panelService.scrollablePanel.addEventListener('scroll', this.callbackOnScroll, false);
+      this.ngZone.runOutsideAngular(() => {
+        this.panelService.scrollablePanel.addEventListener('scroll', this.callbackOnScroll, false);
+      });
     });
   }
 
@@ -142,7 +149,15 @@ export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnCha
   }
 
   private onScroll(e: Event) {
-    if (200 < this.panelService.scrollablePanel.scrollTop) return;
-    this.moreMessages(4);
+    if (this.hasMany && this.panelService.scrollablePanel.scrollTop <= 200) {
+      this.moreMessages(4);
+      this.ngZone.run(() => { });
+    } else if (this.chatTab.hasUnread) {
+      let top = this.panelService.scrollablePanel.scrollHeight - this.panelService.scrollablePanel.clientHeight;
+      if (top - 100 <= this.panelService.scrollablePanel.scrollTop) {
+        this.chatTab.markForRead();
+        this.ngZone.run(() => { });
+      }
+    }
   }
 }

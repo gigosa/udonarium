@@ -11,7 +11,7 @@ import {
 } from '@angular/core';
 
 import { ImageFile } from '@udonarium/core/file-storage/image-file';
-import { EventSystem } from '@udonarium/core/system/system';
+import { EventSystem } from '@udonarium/core/system';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TabletopObject } from '@udonarium/tabletop-object';
 import { TextNote } from '@udonarium/text-note';
@@ -126,9 +126,9 @@ export class TextNoteComponent implements OnInit, OnDestroy, AfterViewInit {
     e.preventDefault();
 
     if (!this.pointerDeviceService.isAllowedToOpenContextMenu) return;
-    let potison = this.pointerDeviceService.pointers[0];
-    console.log('mouseCursor', potison);
-    this.contextMenuService.open(potison, [
+    let position = this.pointerDeviceService.pointers[0];
+    console.log('mouseCursor', position);
+    this.contextMenuService.open(position, [
       { name: 'メモを編集', action: () => { this.showDetail(this.textNote); } },
       {
         name: 'コピーを作る', action: () => {
@@ -187,11 +187,13 @@ export class TextNoteComponent implements OnInit, OnDestroy, AfterViewInit {
     document.body.removeEventListener('mouseup', this.callbackOnMouseUp, false);
   }
 
-  private showDetail(gameObject: TabletopObject) {
+  private showDetail(gameObject: TextNote) {
     console.log('onSelectedGameObject <' + gameObject.aliasName + '>', gameObject.identifier);
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
     let coordinate = this.pointerDeviceService.pointers[0];
-    let option: PanelOption = { left: coordinate.x - 350, top: coordinate.y - 200, width: 700, height: 400 };
+    let title = '共有メモ設定';
+    if (gameObject.title.length) title += ' - ' + gameObject.title;
+    let option: PanelOption = { title: title, left: coordinate.x - 350, top: coordinate.y - 200, width: 700, height: 400 };
     let component = this.panelService.open<GameCharacterSheetComponent>(GameCharacterSheetComponent, option);
     component.tabletopObject = gameObject;
   }

@@ -2,16 +2,17 @@ import { AfterViewInit, ChangeDetectionStrategy, ChangeDetectorRef, Component, O
 
 import { GameObject } from '@udonarium/core/synchronize-object/game-object';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
-import { EventSystem, Network } from '@udonarium/core/system/system';
+import { EventSystem, Network } from '@udonarium/core/system';
 import { DataElement } from '@udonarium/data-element';
-import { DataSummarySetting, SortOrder } from '@udonarium/data-summary-setting';
+import { SortOrder } from '@udonarium/data-summary-setting';
 import { GameCharacter } from '@udonarium/game-character';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TabletopObject } from '@udonarium/tabletop-object';
 
 import { ChatPaletteComponent } from 'component/chat-palette/chat-palette.component';
 import { GameCharacterSheetComponent } from 'component/game-character-sheet/game-character-sheet.component';
-import { ContextMenuAction, ContextMenuService } from 'service/context-menu.service';
+import { ContextMenuAction, ContextMenuService, ContextMenuSeparator } from 'service/context-menu.service';
+import { GameObjectInventoryService } from 'service/game-object-inventory.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 
@@ -29,26 +30,20 @@ export class GameObjectInventoryComponent implements OnInit, AfterViewInit, OnDe
 
   isEdit: boolean = false;
 
-  newLineString: string = '/';
-  private newLineDataElement: DataElement = DataElement.create(this.newLineString);
-
-  private get summarySetting(): DataSummarySetting { return DataSummarySetting.instance; }
-
-  get sortTag(): string { return this.summarySetting.sortTag; }
-  set sortTag(sortTag: string) { this.summarySetting.sortTag = sortTag; }
-  get sortOrder(): SortOrder { return this.summarySetting.sortOrder; }
-  set sortOrder(sortOrder: SortOrder) { this.summarySetting.sortOrder = sortOrder; }
-  get dataTag(): string { return this.summarySetting.dataTag; }
-  set dataTag(dataTag: string) { this.summarySetting.dataTag = dataTag; }
-  get dataTags(): string[] { return this.summarySetting.dataTags; }
+  get sortTag(): string { return this.inventoryService.sortTag; }
+  set sortTag(sortTag: string) { this.inventoryService.sortTag = sortTag; }
+  get sortOrder(): SortOrder { return this.inventoryService.sortOrder; }
+  set sortOrder(sortOrder: SortOrder) { this.inventoryService.sortOrder = sortOrder; }
+  get dataTag(): string { return this.inventoryService.dataTag; }
+  set dataTag(dataTag: string) { this.inventoryService.dataTag = dataTag; }
+  get dataTags(): string[] { return this.inventoryService.dataTags; }
 
   get sortOrderName(): string { return this.sortOrder === SortOrder.ASC ? '昇順' : '降順'; }
-
-  private lazyMarkTimer: NodeJS.Timer = null;
 
   constructor(
     private changeDetector: ChangeDetectorRef,
     private panelService: PanelService,
+    private inventoryService: GameObjectInventoryService,
     private contextMenuService: ContextMenuService,
     private pointerDeviceService: PointerDeviceService
   ) { }
@@ -56,18 +51,17 @@ export class GameObjectInventoryComponent implements OnInit, AfterViewInit, OnDe
   ngOnInit() {
     this.panelService.title = 'インベントリ';
     EventSystem.register(this)
-      .on('UPDATE_GAME_OBJECT', -1000, event => {
-        let object = ObjectStore.instance.get(event.data.identifier);
-        if (object instanceof TabletopObject || object instanceof DataElement || object instanceof DataSummarySetting) this.lazyMarkForCheck();
-      })
-      .on('DELETE_GAME_OBJECT', 1000, event => {
-        this.changeDetector.markForCheck();
-      })
       .on('SELECT_TABLETOP_OBJECT', -1000, event => {
         if (ObjectStore.instance.get(event.data.identifier) instanceof TabletopObject) {
           this.selectedIdentifier = event.data.identifier;
           this.changeDetector.markForCheck();
         }
+      })
+      .on('SYNCHRONIZE_FILE_LIST', event => {
+        if (event.isSendFromSelf) this.changeDetector.markForCheck();
+      })
+      .on('UPDATE_INVENTORY', event => {
+        if (event.isSendFromSelf) this.changeDetector.markForCheck();
       });
     this.inventoryTypes = ['table', 'common', Network.peerId, 'graveyard'];
   }
@@ -92,69 +86,25 @@ export class GameObjectInventoryComponent implements OnInit, AfterViewInit, OnDe
     }
   }
 
-  getGameObjects(inventoryType: string) {
-    let identifiersArray: TabletopObject[][] = [];
-    identifiersArray[0] = ObjectStore.instance.getObjects(GameCharacter);
-    let gameObjects: TabletopObject[] = [];
-
-    for (let identifiers of identifiersArray) {
-      for (let identifier of identifiers) {
-        switch (identifier.location.name) {
-          case 'table':
-            if (inventoryType === 'table') {
-              gameObjects.push(identifier);
-            }
-            break;
-          case Network.peerId:
-            if (inventoryType === Network.peerId) {
-              gameObjects.push(identifier);
-            }
-            break;
-          case 'graveyard':
-            if (inventoryType === 'graveyard') {
-              gameObjects.push(identifier);
-            }
-            break;
-          default:
-            if (inventoryType === 'common' && !this.isPrivateLocation(identifier.location.name)) {
-              gameObjects.push(identifier);
-            }
-            break;
-        }
-      }
+  getInventory(inventoryType: string) {
+    switch (inventoryType) {
+      case 'table':
+        return this.inventoryService.tableInventory;
+      case Network.peerId:
+        return this.inventoryService.privateInventory;
+      case 'graveyard':
+        return this.inventoryService.graveyardInventory;
+      default:
+        return this.inventoryService.commonInventory;
     }
-
-    let sortTag = this.sortTag.length ? this.sortTag.trim() : '';
-    let sortOrder = this.sortOrder === 'ASC' ? -1 : 1;
-    if (sortTag.length) {
-      gameObjects = gameObjects.sort((a, b) => {
-        let aElm = a.rootDataElement.getFirstElementByName(sortTag);
-        let bElm = b.rootDataElement.getFirstElementByName(sortTag);
-        if (!aElm && !bElm) return 0;
-        if (!bElm) return -1;
-        if (!aElm) return 1;
-
-        let aValue = this.convertToSortableValue(aElm.value);
-        let bValue = this.convertToSortableValue(bElm.value);
-        if (aValue < bValue) return sortOrder;
-        if (aValue > bValue) return sortOrder * -1;
-        return 0;
-      });
-    }
-
-    return gameObjects;
   }
 
-  private convertToSortableValue(value: number | string): number | string {
-    let resultStr: string = (value + '').trim().replace(/[Ａ-Ｚａ-ｚ０-９！＂＃＄％＆＇（）＊＋，－．／：；＜＝＞？＠［＼］＾＿｀｛｜｝]/g, function (s) {
-      return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
-    });
-    let resultNum = +resultStr;
-    return Number.isNaN(resultNum) ? resultStr : resultNum;
+  getGameObjects(inventoryType: string): TabletopObject[] {
+    return this.getInventory(inventoryType).tabletopObjects;
   }
 
-  getInventoryTags(data: DataElement): DataElement[] {
-    return this.dataTags.map(tag => tag === this.newLineString ? this.newLineDataElement : data.getFirstElementByName(tag));
+  getInventoryTags(gameObject: GameCharacter): DataElement[] {
+    return this.getInventory(gameObject.location.name).dataElementMap.get(gameObject.identifier);
   }
 
   onContextMenu(e: Event, gameObject: GameCharacter) {
@@ -167,26 +117,20 @@ export class GameObjectInventoryComponent implements OnInit, AfterViewInit, OnDe
 
     this.selectGameObject(gameObject);
 
-    let potison = this.pointerDeviceService.pointers[0];
-    console.log('mouseCursor', potison);
+    let position = this.pointerDeviceService.pointers[0];
+    console.log('mouseCursor', position);
 
     let actions: ContextMenuAction[] = [];
 
     actions.push({ name: '詳細を表示', action: () => { this.showDetail(gameObject); } });
     actions.push({ name: 'チャットパレットを表示', action: () => { this.showChatPalette(gameObject) } });
-    actions.push({
-      name: 'コピーを作る', action: () => {
-        this.cloneGameObject(gameObject);
-        SoundEffect.play(PresetSound.put);
-      }
-    });
+    actions.push(ContextMenuSeparator);
     let locations = [
       { name: 'table', alias: 'テーブルに移動' },
       { name: 'common', alias: '共有イベントリに移動' },
       { name: Network.peerId, alias: '個人イベントリに移動' },
       { name: 'graveyard', alias: '墓場に移動' }
     ];
-
     for (let location of locations) {
       if (gameObject.location.name === location.name) continue;
       actions.push({
@@ -205,8 +149,15 @@ export class GameObjectInventoryComponent implements OnInit, AfterViewInit, OnDe
         }
       });
     }
+    actions.push(ContextMenuSeparator);
+    actions.push({
+      name: 'コピーを作る', action: () => {
+        this.cloneGameObject(gameObject);
+        SoundEffect.play(PresetSound.put);
+      }
+    });
 
-    this.contextMenuService.open(potison, actions, gameObject.name);
+    this.contextMenuService.open(position, actions, gameObject.name);
   }
 
   toggleEdit() {
@@ -217,10 +168,12 @@ export class GameObjectInventoryComponent implements OnInit, AfterViewInit, OnDe
     gameObject.clone();
   }
 
-  private showDetail(gameObject: TabletopObject) {
+  private showDetail(gameObject: GameCharacter) {
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
     let coordinate = this.pointerDeviceService.pointers[0];
-    let option: PanelOption = { left: coordinate.x - 800, top: coordinate.y - 300, width: 800, height: 600 };
+    let title = 'キャラクターシート';
+    if (gameObject.name.length) title += ' - ' + gameObject.name;
+    let option: PanelOption = { title: title, left: coordinate.x - 800, top: coordinate.y - 300, width: 800, height: 600 };
     let component = this.panelService.open<GameCharacterSheetComponent>(GameCharacterSheetComponent, option);
     component.tabletopObject = gameObject;
   }
@@ -241,23 +194,6 @@ export class GameObjectInventoryComponent implements OnInit, AfterViewInit, OnDe
   private deleteGameObject(gameObject: GameObject) {
     gameObject.destroy();
     this.changeDetector.markForCheck();
-  }
-
-  private isPrivateLocation(location: string): boolean {
-    for (let conn of Network.peerContexts) {
-      if (conn.isOpen && location === conn.fullstring) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private lazyMarkForCheck() {
-    if (this.lazyMarkTimer !== null) return;
-    this.lazyMarkTimer = setTimeout(() => {
-      this.lazyMarkTimer = null;
-      this.changeDetector.markForCheck();
-    }, 16);
   }
 
   trackByGameObject(index: number, gameObject: GameObject) {

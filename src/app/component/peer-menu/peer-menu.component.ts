@@ -2,7 +2,7 @@ import { AfterViewInit, Component, NgZone, OnDestroy, OnInit } from '@angular/co
 
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { PeerContext } from '@udonarium/core/system/network/peer-context';
-import { EventSystem, Network } from '@udonarium/core/system/system';
+import { EventSystem, Network } from '@udonarium/core/system';
 import { PeerCursor } from '@udonarium/peer-cursor';
 
 import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
@@ -69,7 +69,7 @@ export class PeerMenuComponent implements OnInit, OnDestroy, AfterViewInit {
       Network.connect(this.targetPeerId);
     } else {
       if (Network.peerContexts.length) {
-        this.help = '入力されたPeer IDはルーム用のPeer IDのようですが、ルーム用Peer IDと通常のPeer IDを混在させることはできません。通常Peerとの接続を切ってください。（※ページリロードでPeer切断ができます）';
+        this.help = '入力されたIDはルーム用のIDのようですが、ルーム用IDと通常のIDを混在させることはできません。プライベート接続を切ってください。（※ページリロードで切断ができます）';
         return;
       }
 

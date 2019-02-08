@@ -1,6 +1,6 @@
 import { AfterViewInit, Component, ElementRef, Input, NgZone, OnDestroy, OnInit, ViewChild } from '@angular/core';
 
-import { EventSystem } from '@udonarium/core/system/system';
+import { EventSystem } from '@udonarium/core/system';
 import { PeerCursor } from '@udonarium/peer-cursor';
 
 import { PointerCoordinate, PointerDeviceService } from 'service/pointer-device.service';
@@ -24,12 +24,12 @@ export class PeerCursorComponent implements OnInit, AfterViewInit, OnDestroy {
   private opacityElement: HTMLElement = null;
   private fadeOutTimer: NodeJS.Timer = null;
 
-  private isAllowedToUpdate: boolean = true;
   private updateInterval: NodeJS.Timer = null;
   private callcack: any = (e) => this.onMouseMove(e);
 
   private _x: number = 0;
   private _y: number = 0;
+  private _target: HTMLElement;
 
   constructor(
     private ngZone: NgZone
@@ -43,11 +43,6 @@ export class PeerCursorComponent implements OnInit, AfterViewInit, OnDestroy {
           this.stopTransition();
           this.setPosition(event.data[0], event.data[1], event.data[2]);
           this.resetFadeOut();
-        });
-    } else {
-      EventSystem.register(this)
-        .on('CURSOR_MOVE', event => {
-          if (event.isSendFromSelf) this.isAllowedToUpdate = true;
         });
     }
   }
@@ -78,28 +73,21 @@ export class PeerCursorComponent implements OnInit, AfterViewInit, OnDestroy {
     if (x === this._x && y === this._y) return;
     this._x = x;
     this._y = y;
-    if (!this.updateInterval && this.isAllowedToUpdate) {
-      this.isAllowedToUpdate = false;
+    this._target = e.target;
+    if (!this.updateInterval) {
       this.updateInterval = setTimeout(() => {
         this.updateInterval = null;
-        this.calcLocalCoordinate(this._x, this._y, e.target);
+        this.calcLocalCoordinate(this._x, this._y, this._target);
       }, 100);
     }
   }
 
   private calcLocalCoordinate(x: number, y: number, target: HTMLElement) {
-    let isTerrain = true;
-    let node: HTMLElement = target;
+    if (!document.getElementById('app-table-layer').contains(target)) return;
+
     let dragArea = document.getElementById('app-game-table');
-
-    while (node) {
-      if (node === dragArea) break;
-      node = node.parentElement;
-    }
-    if (node == null) isTerrain = false;
-
     let coordinate: PointerCoordinate = { x: x, y: y, z: 0 };
-    if (!isTerrain) {
+    if (target.contains(dragArea)) {
       coordinate = PointerDeviceService.convertToLocal(coordinate, dragArea);
       coordinate.z = 0;
     } else {
@@ -107,15 +95,6 @@ export class PeerCursorComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     EventSystem.call('CURSOR_MOVE', [coordinate.x, coordinate.y, coordinate.z]);
-  }
-
-  private findDragAreaElement(parent: HTMLElement): HTMLElement {
-    if (parent.tagName === 'DIV') {
-      return parent;
-    } else if (parent.tagName !== 'BODY') {
-      return this.findDragAreaElement(parent.parentElement);
-    }
-    return null;
   }
 
   private resetFadeOut() {
