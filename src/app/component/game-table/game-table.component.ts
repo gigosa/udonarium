@@ -472,16 +472,4 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   trackByGameObject(index: number, gameObject: GameObject) {
     return gameObject.identifier;
   }
-
-  private makeDefaultTable() {
-    let tableSelecter = new TableSelecter('tableSelecter');
-    tableSelecter.initialize();
-
-    let gameTable = new GameTable('gameTable');
-
-    tableSelecter.viewTableIdentifier = gameTable.identifier;
-  }
-
-  private makeDefaultTabletopObjects() {
-  }
 }
