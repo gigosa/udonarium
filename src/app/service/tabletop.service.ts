@@ -17,6 +17,7 @@ import { TabletopObject } from '@udonarium/tabletop-object';
 import { Terrain } from '@udonarium/terrain';
 import { TextNote } from '@udonarium/text-note';
 
+import { ContextMenuAction } from './context-menu.service';
 import { PointerCoordinate, PointerDeviceService } from './pointer-device.service';
 
 type ObjectIdentifier = string;
@@ -284,6 +285,86 @@ export class TabletopService {
   }
 
   makeDefaultTabletopObjects() {
+  }
+
+  getContextMenuActionsForCreateObject(position: PointerCoordinate): ContextMenuAction[] {
+    return [
+      this.getCreateCharacterMenu(position),
+      this.getCreateTableMaskMenu(position),
+      this.getCreateTerrainMenu(position),
+      this.getCreateTextNoteMenu(position),
+      this.getCreateTrumpMenu(position),
+      this.getCreateDiceSymbolMenu(position),
+    ];
+  }
+
+  private getCreateCharacterMenu(position: PointerCoordinate): ContextMenuAction {
+    return {
+      name: 'キャラクターを作成', action: () => {
+        let character = this.createGameCharacter(position);
+        EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: character.identifier, className: character.aliasName });
+        SoundEffect.play(PresetSound.put);
+      }
+    }
+  }
+
+  private getCreateTableMaskMenu(position: PointerCoordinate): ContextMenuAction {
+    return {
+      name: 'マップマスクを作成', action: () => {
+        this.createGameTableMask(position);
+        SoundEffect.play(PresetSound.put);
+      }
+    }
+  }
+
+  private getCreateTerrainMenu(position: PointerCoordinate): ContextMenuAction {
+    return {
+      name: '地形を作成', action: () => {
+        this.createTerrain(position);
+        SoundEffect.play(PresetSound.lock);
+      }
+    }
+  }
+
+  private getCreateTextNoteMenu(position: PointerCoordinate): ContextMenuAction {
+    return {
+      name: '共有メモを作成', action: () => {
+        this.createTextNote(position);
+        SoundEffect.play(PresetSound.put);
+      }
+    }
+  }
+
+  private getCreateTrumpMenu(position: PointerCoordinate): ContextMenuAction {
+    return {
+      name: 'トランプの山札を作成', action: () => {
+        this.createTrump(position);
+        SoundEffect.play(PresetSound.cardPut);
+      }
+    }
+  }
+
+  private getCreateDiceSymbolMenu(position: PointerCoordinate): ContextMenuAction {
+    let dices: { menuName: string, diceName: string, type: DiceType, imagePathPrefix: string }[] = [
+      { menuName: 'D4', diceName: 'D4', type: DiceType.D4, imagePathPrefix: '4_dice' },
+      { menuName: 'D6', diceName: 'D6', type: DiceType.D6, imagePathPrefix: '6_dice' },
+      { menuName: 'D8', diceName: 'D8', type: DiceType.D8, imagePathPrefix: '8_dice' },
+      { menuName: 'D10', diceName: 'D10', type: DiceType.D10, imagePathPrefix: '10_dice' },
+      { menuName: 'D10 (00-90)', diceName: 'D10', type: DiceType.D10_10TIMES, imagePathPrefix: '100_dice' },
+      { menuName: 'D12', diceName: 'D12', type: DiceType.D12, imagePathPrefix: '12_dice' },
+      { menuName: 'D20', diceName: 'D20', type: DiceType.D20, imagePathPrefix: '20_dice' },
+    ];
+    let subMenus: ContextMenuAction[] = [];
+
+    dices.forEach(item => {
+      subMenus.push({
+        name: item.menuName, action: () => {
+          this.createDiceSymbol(position, item.diceName, item.type, item.imagePathPrefix);
+          SoundEffect.play(PresetSound.put);
+        }
+      });
+    });
+    return { name: 'ダイスを作成', action: null, subActions: subMenus };
   }
 }
 
