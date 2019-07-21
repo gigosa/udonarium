@@ -64,6 +64,12 @@ export class GameObjectInventoryComponent implements OnInit, AfterViewInit, OnDe
       })
       .on('UPDATE_INVENTORY', event => {
         if (event.isSendFromSelf) this.changeDetector.markForCheck();
+      })
+      .on('OPEN_PEER', event => {
+        this.inventoryTypes = ['table', 'common', Network.peerId, 'graveyard'];
+        if (!this.inventoryTypes.includes(this.selectTab)) {
+          this.selectTab = Network.peerId;
+        }
       });
     this.inventoryTypes = ['table', 'common', Network.peerId, 'graveyard'];
   }
@@ -111,7 +117,6 @@ export class GameObjectInventoryComponent implements OnInit, AfterViewInit, OnDe
 
   onContextMenu(e: Event, gameObject: GameCharacter) {
     if (document.activeElement instanceof HTMLInputElement && document.activeElement.getAttribute('type') !== 'range') return;
-    console.log('onContextMenu');
     e.stopPropagation();
     e.preventDefault();
 
@@ -120,7 +125,6 @@ export class GameObjectInventoryComponent implements OnInit, AfterViewInit, OnDe
     this.selectGameObject(gameObject);
 
     let position = this.pointerDeviceService.pointers[0];
-    console.log('mouseCursor', position);
 
     let actions: ContextMenuAction[] = [];
 
@@ -138,7 +142,7 @@ export class GameObjectInventoryComponent implements OnInit, AfterViewInit, OnDe
       actions.push({
         name: location.alias, action: () => {
           gameObject.setLocation(location.name);
-          SoundEffect.play(PresetSound.put);
+          SoundEffect.play(PresetSound.piecePut);
         }
       });
     }
@@ -147,7 +151,7 @@ export class GameObjectInventoryComponent implements OnInit, AfterViewInit, OnDe
       actions.push({
         name: '削除する', action: () => {
           this.deleteGameObject(gameObject);
-          SoundEffect.play(PresetSound.delete);
+          SoundEffect.play(PresetSound.sweep);
         }
       });
     }
@@ -155,7 +159,7 @@ export class GameObjectInventoryComponent implements OnInit, AfterViewInit, OnDe
     actions.push({
       name: 'コピーを作る', action: () => {
         this.cloneGameObject(gameObject);
-        SoundEffect.play(PresetSound.put);
+        SoundEffect.play(PresetSound.piecePut);
       }
     });
 
@@ -164,6 +168,16 @@ export class GameObjectInventoryComponent implements OnInit, AfterViewInit, OnDe
 
   toggleEdit() {
     this.isEdit = !this.isEdit;
+  }
+
+  cleanInventory() {
+    let tabTitle = this.getTabTitle(this.selectTab);
+    let gameObjects = this.getGameObjects(this.selectTab);
+    if (!confirm(`${tabTitle}に存在する${gameObjects.length}個の要素を完全に削除しますか？`)) return;
+    for (const gameObject of gameObjects) {
+      this.deleteGameObject(gameObject);
+    }
+    SoundEffect.play(PresetSound.sweep);
   }
 
   private cloneGameObject(gameObject: TabletopObject) {
@@ -182,14 +196,13 @@ export class GameObjectInventoryComponent implements OnInit, AfterViewInit, OnDe
 
   private showChatPalette(gameObject: GameCharacter) {
     let coordinate = this.pointerDeviceService.pointers[0];
-    let option: PanelOption = { left: coordinate.x - 250, top: coordinate.y - 175, width: 500, height: 350 };
+    let option: PanelOption = { left: coordinate.x - 250, top: coordinate.y - 175, width: 615, height: 350 };
     let component = this.panelService.open<ChatPaletteComponent>(ChatPaletteComponent, option);
     component.character = gameObject;
   }
 
-  private selectGameObject(gameObject: GameObject) {
+  selectGameObject(gameObject: GameObject) {
     let aliasName: string = gameObject.aliasName;
-    console.log('onSelectedGameObject <' + aliasName + '>', gameObject.identifier);
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
   }
 

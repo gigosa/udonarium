@@ -6,6 +6,9 @@
     (click)="selectGameObject(gameObject)" [ngClass]="{'box': true, 'selected': (selectedIdentifier === gameObject.identifier)}">
     <ng-container *ngTemplateOutlet="gameObjectTags; context:{ gameObject: gameObject}"></ng-container>
   </div>
+  <div *ngIf="selectTab === 'graveyard'" style="padding-top: 6px;">
+    <button class="danger" (click)="cleanInventory()" [attr.disabled]="getGameObjects(selectTab).length < 1 ? '' : null">墓場を空にする</button>
+  </div>
 </div>
 <ng-template #inventoryTab>
   <form class="is-sticky-top">
@@ -55,7 +58,7 @@
     </div>
     <div class="object-tags-box">
       <div class="table-cell image-box">
-        <img *ngIf="gameObject.imageFile" [src]="gameObject.imageFile.url | safe: 'resourceUrl'" />
+        <img *ngIf="gameObject.imageFile.url" [src]="gameObject.imageFile.url | safe: 'resourceUrl'" />
       </div>
       <div class="table-cell">
         <div *ngIf="gameObject.rootDataElement">

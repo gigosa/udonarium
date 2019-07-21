@@ -8,7 +8,7 @@ import { ContextMenuAction, ContextMenuService } from 'service/context-menu.serv
   styleUrls: ['./context-menu.component.css']
 })
 export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
-  @ViewChild('root') rootElementRef: ElementRef;
+  @ViewChild('root', { static: true }) rootElementRef: ElementRef;
 
   @Input() title: string = '';
   @Input() actions: ContextMenuAction[] = [];
@@ -57,7 +57,6 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
 
   @HostListener('contextmenu', ['$event'])
   onContextMenu(e: Event) {
-    console.log('onContextMenu');
     e.stopPropagation();
     e.preventDefault();
   }
@@ -103,7 +102,6 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   private adjustPositionSub() {
-    console.log('adjustPosition subMenu');
     let $parent = $(this.elementRef.nativeElement.parentElement);
     let $submenu = $(this.rootElementRef.nativeElement);
     let offsetLeft = $submenu.offset().left;
@@ -128,7 +126,6 @@ export class ContextMenuComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   doAction(action: ContextMenuAction) {
-    console.log('ContextMenu action');
     this.showSubMenu(action);
     if (action.action != null) {
       action.action();

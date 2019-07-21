@@ -1,9 +1,11 @@
 import { ChatMessage, ChatMessageContext } from './chat-message';
+import { ChatTab } from './chat-tab';
 import { SyncObject } from './core/synchronize-object/decorator';
 import { GameObject } from './core/synchronize-object/game-object';
 import { ObjectStore } from './core/synchronize-object/object-store';
 import { EventSystem } from './core/system';
 import { PromiseQueue } from './core/system/util/promise-queue';
+import { StringUtil } from './core/system/util/string-util';
 
 declare var Opal
 
@@ -84,6 +86,7 @@ export class DiceBot extends GameObject {
     { script: 'ShinkuuGakuen', game: '真空学園' },
     { script: 'ShinMegamiTenseiKakuseihen', game: '真・女神転生TRPG　覚醒編' },
     { script: 'SRS', game: 'Standard RPG System' },
+    { script: 'StratoShout', game: 'ストラトシャウト' },
     { script: 'TherapieSein', game: '青春疾患セラフィザイン' },
     { script: 'EtrianOdysseySRS', game: '世界樹の迷宮SRS' },
     { script: 'ZettaiReido', game: '絶対隷奴' },
@@ -102,11 +105,13 @@ export class DiceBot extends GameObject {
     { script: 'DetatokoSaga', game: 'でたとこサーガ' },
     { script: 'DeadlineHeroes', game: 'デッドラインヒーローズ' },
     { script: 'DemonParasite', game: 'デモンパラサイト' },
+    { script: 'TokyoGhostResearch', game: '東京ゴーストリサーチ' },
     { script: 'TokyoNova', game: 'トーキョーＮ◎ＶＡ' },
     { script: 'Torg', game: 'トーグ' },
     { script: 'Torg1_5', game: 'トーグ1.5版' },
     { script: 'TokumeiTenkousei', game: '特命転攻生' },
     { script: 'Dracurouge', game: 'ドラクルージュ' },
+    { script: 'TrinitySeven', game: 'トリニティセブンRPG' },
     { script: 'TwilightGunsmoke', game: 'トワイライト・ガンスモーク' },
     { script: 'TunnelsAndTrolls', game: 'トンネルズ＆トロールズ' },
     { script: 'NightWizard', game: 'ナイトウィザード2版' },
@@ -129,6 +134,7 @@ export class DiceBot extends GameObject {
     { script: 'BeginningIdol', game: 'ビギニングアイドル' },
     { script: 'PhantasmAdventure', game: 'ファンタズムアドベンチャー' },
     { script: 'FilledWith', game: 'フィルトウィズ' },
+    { script: 'FutariSousa', game: 'フタリソウサ' },
     { script: 'BlindMythos', game: 'ブラインド・ミトス' },
     { script: 'BloodCrusade', game: 'ブラッド・クルセイド' },
     { script: 'BloodMoon', game: 'ブラッド・ムーン' },
@@ -277,22 +283,28 @@ export class DiceBot extends GameObject {
     super.onStoreAdded();
     DiceBot.queue.add(DiceBot.loadScriptAsync('./assets/cgiDiceBot.js'));
     EventSystem.register(this)
-      .on<ChatMessageContext>('BROADCAST_MESSAGE', 100, async event => {
-        if (!event.isSendFromSelf) return;
-        let chatMessage = ObjectStore.instance.get<ChatMessage>(event.data.identifier);
-        if (!chatMessage || chatMessage.isSystem) return;
-        console.log('BROADCAST_MESSAGE DiceBot...?');
-        let text: string = chatMessage.text;
+      .on('SEND_MESSAGE', async event => {
+        let chatMessage = ObjectStore.instance.get<ChatMessage>(event.data.messageIdentifier);
+        if (!chatMessage || !chatMessage.isSendFromSelf || chatMessage.isSystem) return;
 
-        text = text.replace(/[Ａ-Ｚａ-ｚ０-９！＂＃＄％＆＇（）＊＋，－．／：；＜＝＞？＠［＼］＾＿｀｛｜｝]/g, function (s) {
-          return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
-        });
-
+        let text: string = StringUtil.toHalfWidth(chatMessage.text);
         let gameType: string = chatMessage.tag;
 
         try {
-          let rollResult = await DiceBot.diceRollAsync(text, gameType);
-          this.sendResultMessage(rollResult, chatMessage);
+          let regArray = /^((\d+)?\s+)?([^\s]*)?/ig.exec(text);
+          let repeat: number = (regArray[2] != null) ? Number(regArray[2]) : 1;
+          let rollText: string = (regArray[3] != null) ? regArray[3] : text;
+
+          let finalResult: DiceRollResult = { result: '', isSecret: false };
+          for (let i = 0; i < repeat && i < 32; i++) {
+            let rollResult = await DiceBot.diceRollAsync(rollText, gameType);
+            if (rollResult.result.length < 1) break;
+
+            finalResult.result += rollResult.result;
+            finalResult.isSecret = finalResult.isSecret || rollResult.isSecret;
+            if (1 < repeat) finalResult.result += ` #${i + 1}`;
+          }
+          this.sendResultMessage(finalResult, chatMessage);
         } catch (e) {
           console.error(e);
         }
@@ -312,10 +324,7 @@ export class DiceBot extends GameObject {
 
     if (result.length < 1) return;
 
-    result = result.replace(/[＞]/g, function (s) {
-      return '→';
-    });
-    result = result.trim();
+    result = result.replace(/[＞]/g, s => '→').trim();
 
     let diceBotMessage: ChatMessageContext = {
       identifier: '',
@@ -335,7 +344,8 @@ export class DiceBot extends GameObject {
         diceBotMessage.to += ' ' + originalMessage.from;
       }
     }
-    EventSystem.call('BROADCAST_MESSAGE', diceBotMessage);
+    let chatTab = ObjectStore.instance.get<ChatTab>(originalMessage.tabIdentifier);
+    if (chatTab) chatTab.addMessage(diceBotMessage);
   }
 
   static diceRollAsync(message: string, gameType: string): Promise<DiceRollResult> {
@@ -346,11 +356,12 @@ export class DiceBot extends GameObject {
         return { result: '', isSecret: false };
       }
       let result = [];
-      let dir = []
-      let diceBotTablePrefix = 'diceBotTable_'
+      let dir = [];
+      let diceBotTablePrefix = 'diceBotTable_';
       let isNeedResult = true;
       try {
-        let cgiDiceBot = Opal.get('CgiDiceBot').$new();
+        Opal.gvars.isDebug = false;
+        let cgiDiceBot = Opal.CgiDiceBot.$new();
         result = cgiDiceBot.$roll(message, gameType, dir, diceBotTablePrefix, isNeedResult);
         console.log('diceRoll!!!', result);
         console.log('isSecret!!!', cgiDiceBot.isSecret);
@@ -365,17 +376,15 @@ export class DiceBot extends GameObject {
   static getHelpMessage(gameType: string): Promise<string> {
     DiceBot.queue.add(DiceBot.loadDiceBotAsync(gameType));
     return DiceBot.queue.add(() => {
-      console.log('getHelpMessage');
       if ('Opal' in window === false) {
         console.warn('Opal is not loaded...');
         return '';
       }
       let help = '';
       try {
-        let bcdice = Opal.get('CgiDiceBot').$new().$newBcDice();
+        let bcdice = Opal.CgiDiceBot.$new().$newBcDice();
         bcdice.$setGameByTitle(gameType);
         help = bcdice.diceBot.$getHelpMessage();
-        console.log('bot.getHelpMessage()!!!', help);
       } catch (e) {
         console.error(e);
       }
@@ -438,27 +447,21 @@ export class DiceBot extends GameObject {
 
   private static loadExtratablesAsync(path: string, table: string) {
     return new Promise<void>((resolve, reject) => {
-      let http = new XMLHttpRequest();
-      http.open('get', path, true);
-      http.onerror = (event) => {
-        console.error(event);
-        resolve();
-      };
-      http.onreadystatechange = (event) => {
-        if (http.readyState !== 4) {
-          return;
-        }
-        if (http.status === 200) {
-          console.log(table + ' is loading OK!!!');
-          let tableFileData = Opal.get('TableFileData');
+      fetch(path)
+        .then(response => {
+          if (response.ok) return response.text();
+          throw new Error('Network response was not ok.');
+        })
+        .then(text => {
           let array = /((.+)_(.+)).txt$/ig.exec(table);
-          tableFileData.$setVirtualTableData(array[1], array[2], array[3], http.responseText);
-        } else {
-          console.warn(table + 'fail...? status:' + http.status);
-        }
-        resolve();
-      };
-      http.send(null);
+          Opal.TableFileData.$setVirtualTableData(array[1], array[2], array[3], text);
+          console.log(table + ' is loading OK!!!');
+          resolve();
+        })
+        .catch(error => {
+          console.warn('There has been a problem with your fetch operation: ', error.message);
+          resolve();
+        });
     });
   }
 }

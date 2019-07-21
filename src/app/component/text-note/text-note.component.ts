@@ -1,21 +1,10 @@
-import {
-  AfterViewInit,
-  Component,
-  ElementRef,
-  HostListener,
-  Input,
-  NgZone,
-  OnDestroy,
-  OnInit,
-  ViewChild,
-} from '@angular/core';
-
+import { AfterViewInit, ChangeDetectionStrategy, ChangeDetectorRef, Component, ElementRef, HostListener, Input, NgZone, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { ImageFile } from '@udonarium/core/file-storage/image-file';
+import { ObjectNode } from '@udonarium/core/synchronize-object/object-node';
+import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem } from '@udonarium/core/system';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
-import { TabletopObject } from '@udonarium/tabletop-object';
 import { TextNote } from '@udonarium/text-note';
-
 import { GameCharacterSheetComponent } from 'component/game-character-sheet/game-character-sheet.component';
 import { MovableOption } from 'directive/movable.directive';
 import { RotableOption } from 'directive/rotable.directive';
@@ -26,10 +15,11 @@ import { PointerDeviceService } from 'service/pointer-device.service';
 @Component({
   selector: 'text-note',
   templateUrl: './text-note.component.html',
-  styleUrls: ['./text-note.component.css']
+  styleUrls: ['./text-note.component.css'],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class TextNoteComponent implements OnInit, OnDestroy, AfterViewInit {
-  @ViewChild('textArea') textAreaElementRef: ElementRef;
+  @ViewChild('textArea', { static: true }) textAreaElementRef: ElementRef;
 
   @Input() textNote: TextNote = null;
   @Input() is3D: boolean = false;
@@ -59,10 +49,25 @@ export class TextNoteComponent implements OnInit, OnDestroy, AfterViewInit {
     private ngZone: NgZone,
     private contextMenuService: ContextMenuService,
     private panelService: PanelService,
+    private changeDetector: ChangeDetectorRef,
     private pointerDeviceService: PointerDeviceService
   ) { }
 
   ngOnInit() {
+    EventSystem.register(this)
+      .on('UPDATE_GAME_OBJECT', -1000, event => {
+        let object = ObjectStore.instance.get(event.data.identifier);
+        if (!this.textNote || !object) return;
+        if (this.textNote === object || (object instanceof ObjectNode && this.textNote.contains(object))) {
+          this.changeDetector.markForCheck();
+        }
+      })
+      .on('SYNCHRONIZE_FILE_LIST', event => {
+        this.changeDetector.markForCheck();
+      })
+      .on('UPDATE_FILE_RESOURE', -1000, event => {
+        this.changeDetector.markForCheck();
+      });
     this.movableOption = {
       tabletopObject: this.textNote,
       transformCssOffset: 'translateZ(0.15px)',
@@ -81,7 +86,6 @@ export class TextNoteComponent implements OnInit, OnDestroy, AfterViewInit {
 
   @HostListener('dragstart', ['$event'])
   onDragstart(e) {
-    console.log('Dragstart Cancel !!!!');
     e.stopPropagation();
     e.preventDefault();
   }
@@ -103,7 +107,6 @@ export class TextNoteComponent implements OnInit, OnDestroy, AfterViewInit {
 
   onMouseUp(e: any) {
     if (this.pointerDeviceService.isAllowedToOpenContextMenu) {
-      console.log('this.textAreaElementRef.nativeElement.focus() !!!!');
       let selection = window.getSelection();
       if (!selection.isCollapsed) selection.removeAllRanges();
       this.textAreaElementRef.nativeElement.focus();
@@ -119,7 +122,6 @@ export class TextNoteComponent implements OnInit, OnDestroy, AfterViewInit {
 
   @HostListener('contextmenu', ['$event'])
   onContextMenu(e: Event) {
-    console.log('onContextMenu');
     this.removeMouseEventListeners();
     if (this.isSelected) return;
     e.stopPropagation();
@@ -127,7 +129,6 @@ export class TextNoteComponent implements OnInit, OnDestroy, AfterViewInit {
 
     if (!this.pointerDeviceService.isAllowedToOpenContextMenu) return;
     let position = this.pointerDeviceService.pointers[0];
-    console.log('mouseCursor', position);
     this.contextMenuService.open(position, [
       { name: 'メモを編集', action: () => { this.showDetail(this.textNote); } },
       {
@@ -136,25 +137,25 @@ export class TextNoteComponent implements OnInit, OnDestroy, AfterViewInit {
           console.log('コピー', cloneObject);
           cloneObject.location.x += this.gridSize;
           cloneObject.location.y += this.gridSize;
-          cloneObject.update();
-          SoundEffect.play(PresetSound.put);
+          cloneObject.toTopmost();
+          SoundEffect.play(PresetSound.cardPut);
         }
       },
       {
         name: '削除する', action: () => {
           this.textNote.destroy();
-          SoundEffect.play(PresetSound.delete);
+          SoundEffect.play(PresetSound.sweep);
         }
       },
     ], this.title);
   }
 
   onMove() {
-    SoundEffect.play(PresetSound.pick);
+    SoundEffect.play(PresetSound.cardPick);
   }
 
   onMoved() {
-    SoundEffect.play(PresetSound.put);
+    SoundEffect.play(PresetSound.cardPut);
   }
 
   calcFitHeightIfNeeded() {
@@ -188,7 +189,6 @@ export class TextNoteComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   private showDetail(gameObject: TextNote) {
-    console.log('onSelectedGameObject <' + gameObject.aliasName + '>', gameObject.identifier);
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
     let coordinate = this.pointerDeviceService.pointers[0];
     let title = '共有メモ設定';

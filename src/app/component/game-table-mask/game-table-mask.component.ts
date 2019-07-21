@@ -1,10 +1,19 @@
-import { AfterViewInit, Component, HostListener, Input, OnDestroy, OnInit } from '@angular/core';
-
+import {
+  AfterViewInit,
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
+  Component,
+  HostListener,
+  Input,
+  OnDestroy,
+  OnInit,
+} from '@angular/core';
 import { ImageFile } from '@udonarium/core/file-storage/image-file';
+import { ObjectNode } from '@udonarium/core/synchronize-object/object-node';
+import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem } from '@udonarium/core/system';
 import { GameTableMask } from '@udonarium/game-table-mask';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
-
 import { GameCharacterSheetComponent } from 'component/game-character-sheet/game-character-sheet.component';
 import { MovableOption } from 'directive/movable.directive';
 import { ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
@@ -15,7 +24,8 @@ import { TabletopService } from 'service/tabletop.service';
 @Component({
   selector: 'game-table-mask',
   templateUrl: './game-table-mask.component.html',
-  styleUrls: ['./game-table-mask.component.css']
+  styleUrls: ['./game-table-mask.component.css'],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class GameTableMaskComponent implements OnInit, OnDestroy, AfterViewInit {
   @Input() gameTableMask: GameTableMask = null;
@@ -37,10 +47,25 @@ export class GameTableMaskComponent implements OnInit, OnDestroy, AfterViewInit 
     private tabletopService: TabletopService,
     private contextMenuService: ContextMenuService,
     private panelService: PanelService,
+    private changeDetector: ChangeDetectorRef,
     private pointerDeviceService: PointerDeviceService
   ) { }
 
   ngOnInit() {
+    EventSystem.register(this)
+      .on('UPDATE_GAME_OBJECT', -1000, event => {
+        let object = ObjectStore.instance.get(event.data.identifier);
+        if (!this.gameTableMask || !object) return;
+        if (this.gameTableMask === object || (object instanceof ObjectNode && this.gameTableMask.contains(object))) {
+          this.changeDetector.markForCheck();
+        }
+      })
+      .on('SYNCHRONIZE_FILE_LIST', event => {
+        this.changeDetector.markForCheck();
+      })
+      .on('UPDATE_FILE_RESOURE', -1000, event => {
+        this.changeDetector.markForCheck();
+      });
     this.movableOption = {
       tabletopObject: this.gameTableMask,
       transformCssOffset: 'translateZ(0.15px)',
@@ -56,14 +81,12 @@ export class GameTableMaskComponent implements OnInit, OnDestroy, AfterViewInit 
 
   @HostListener('dragstart', ['$event'])
   onDragstart(e) {
-    console.log('Dragstart Cancel !!!!');
     e.stopPropagation();
     e.preventDefault();
   }
 
   @HostListener('mousedown', ['$event'])
   onMouseDown(e: any) {
-    console.log('GameCharacterComponent mousedown !!!');
     e.preventDefault();
 
     // TODO:もっと良い方法考える
@@ -74,26 +97,24 @@ export class GameTableMaskComponent implements OnInit, OnDestroy, AfterViewInit 
 
   @HostListener('contextmenu', ['$event'])
   onContextMenu(e: Event) {
-    console.log('onContextMenu');
     e.stopPropagation();
     e.preventDefault();
 
     if (!this.pointerDeviceService.isAllowedToOpenContextMenu) return;
     let menuPosition = this.pointerDeviceService.pointers[0];
     let objectPosition = this.tabletopService.calcTabletopLocalCoordinate();
-    console.log('mouseCursor', menuPosition);
     this.contextMenuService.open(menuPosition, [
       (this.isLock
         ? {
           name: '固定解除', action: () => {
             this.isLock = false;
-            SoundEffect.play(PresetSound.switch);
+            SoundEffect.play(PresetSound.unlock);
           }
         }
         : {
           name: '固定する', action: () => {
             this.isLock = true;
-            SoundEffect.play(PresetSound.switch);
+            SoundEffect.play(PresetSound.lock);
           }
         }
       ),
@@ -107,13 +128,13 @@ export class GameTableMaskComponent implements OnInit, OnDestroy, AfterViewInit 
           cloneObject.location.y += this.gridSize;
           cloneObject.isLock = false;
           if (this.gameTableMask.parent) this.gameTableMask.parent.appendChild(cloneObject);
-          SoundEffect.play(PresetSound.put);
+          SoundEffect.play(PresetSound.cardPut);
         }
       },
       {
         name: '削除する', action: () => {
           this.gameTableMask.destroy();
-          SoundEffect.play(PresetSound.delete);
+          SoundEffect.play(PresetSound.sweep);
         }
       },
       ContextMenuSeparator,
@@ -122,11 +143,11 @@ export class GameTableMaskComponent implements OnInit, OnDestroy, AfterViewInit 
   }
 
   onMove() {
-    SoundEffect.play(PresetSound.pick);
+    SoundEffect.play(PresetSound.cardPick);
   }
 
   onMoved() {
-    SoundEffect.play(PresetSound.put);
+    SoundEffect.play(PresetSound.cardPut);
   }
 
   private adjustMinBounds(value: number, min: number = 0): number {

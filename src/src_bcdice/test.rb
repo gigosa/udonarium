@@ -20,8 +20,7 @@ libPaths = [
   "#{rootDir}/irc"
 ]
 libPaths.each do |libPath|
-  #TKfix <<
-  $LOAD_PATH = $LOAD_PATH + libPath
+  $LOAD_PATH << libPath
 end
 
 require 'DiceBotTest'

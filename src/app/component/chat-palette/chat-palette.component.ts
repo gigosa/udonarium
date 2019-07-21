@@ -1,11 +1,10 @@
 import { Component, ElementRef, Input, OnDestroy, OnInit, ViewChild } from '@angular/core';
 
-import { ChatMessageContext } from '@udonarium/chat-message';
 import { ChatPalette } from '@udonarium/chat-palette';
 import { ChatTab } from '@udonarium/chat-tab';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
-import { PeerContext } from '@udonarium/core/system/network/peer-context';
 import { EventSystem, Network } from '@udonarium/core/system';
+import { PeerContext } from '@udonarium/core/system/network/peer-context';
 import { DiceBot } from '@udonarium/dice-bot';
 import { GameCharacter } from '@udonarium/game-character';
 import { PeerCursor } from '@udonarium/peer-cursor';
@@ -21,7 +20,7 @@ import { PointerDeviceService } from 'service/pointer-device.service';
   styleUrls: ['./chat-palette.component.css']
 })
 export class ChatPaletteComponent implements OnInit, OnDestroy {
-  @ViewChild('textArea') textAreaElementRef: ElementRef;
+  @ViewChild('textArea', { static: true }) textAreaElementRef: ElementRef;
   @Input() character: GameCharacter = null;
 
   get palette(): ChatPalette { return this.character.chatPalette; }
@@ -38,6 +37,18 @@ export class ChatPaletteComponent implements OnInit, OnDestroy {
 
   isEdit: boolean = false;
   editPalette: string = '';
+
+  private shouldUpdateCharacterList: boolean = true;
+  private _gameCharacters: GameCharacter[] = [];
+  get gameCharacters(): GameCharacter[] {
+    if (this.shouldUpdateCharacterList) {
+      this.shouldUpdateCharacterList = false;
+      this._gameCharacters = ObjectStore.instance
+        .getObjects<GameCharacter>(GameCharacter)
+        .filter(character => this.allowsChat(character));
+    }
+    return this._gameCharacters;
+  }
 
   private writingEventInterval: NodeJS.Timer = null;
   private previousWritingLength: number = 0;
@@ -61,6 +72,13 @@ export class ChatPaletteComponent implements OnInit, OnDestroy {
     this.chatTabidentifier = this.chatMessageService.chatTabs ? this.chatMessageService.chatTabs[0].identifier : '';
     this.gameType = this.character.chatPalette ? this.character.chatPalette.dicebot : '';
     EventSystem.register(this)
+      .on('UPDATE_GAME_OBJECT', -1000, event => {
+        if (event.data.aliasName !== GameCharacter.aliasName) return;
+        this.shouldUpdateCharacterList = true;
+        if (this.character && !this.allowsChat(this.character)) {
+          if (0 < this.gameCharacters.length) this.onSelectedCharacter(this.gameCharacters[0].identifier);
+        }
+      })
       .on('CLOSE_OTHER_PEER', event => {
         let object = ObjectStore.instance.get(this.sendTo);
         if (object instanceof PeerCursor && object.peerId === event.data.peer) {
@@ -71,6 +89,18 @@ export class ChatPaletteComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     EventSystem.unregister(this);
+    if (this.isEdit) this.toggleEditMode();
+  }
+
+  updatePanelTitle() {
+    this.panelService.title = this.character.name + ' のチャットパレット';
+  }
+
+  onSelectedCharacter(identifier: string) {
+    if (this.isEdit) this.toggleEditMode();
+    let object = ObjectStore.instance.get(identifier);
+    if (object instanceof GameCharacter) this.character = object;
+    this.updatePanelTitle();
   }
 
   selectPalette(line: string) {
@@ -135,41 +165,11 @@ export class ChatPaletteComponent implements OnInit, OnDestroy {
     if (event) event.preventDefault();
 
     if (!this.text.length) return;
-
     if (event && event.keyCode !== 13) return;
 
-    let time = this.chatMessageService.getTime();
-    console.log('time:' + time);
-    let chatMessage: ChatMessageContext = {
-      from: Network.peerContext.id,
-      name: this.character.name,
-      text: this.palette.evaluate(this.text, this.character.rootDataElement),
-      timestamp: time,
-      tag: this.gameType,
-      imageIdentifier: this.character.imageFile ? this.character.imageFile.identifier : '',
-    };
-
-    if (this.sendTo != null && this.sendTo.length) {
-      let name = '';
-      let object = ObjectStore.instance.get(this.sendTo);
-      if (object instanceof GameCharacter) {
-        name = object.name;
-        chatMessage.to = object.identifier;
-      } else if (object instanceof PeerCursor) {
-        name = object.name;
-        let peer = PeerContext.create(object.peerId);
-        if (peer) chatMessage.to = peer.id;
-      }
-      chatMessage.name += ' > ' + name;
-    }
-
     if (this.chatTab) {
-      let latestTimeStamp: number = 0 < this.chatTab.chatMessages.length
-        ? this.chatTab.chatMessages[this.chatTab.chatMessages.length - 1].timestamp
-        : chatMessage.timestamp;
-      if (chatMessage.timestamp <= latestTimeStamp) chatMessage.timestamp = latestTimeStamp + 1;
-
-      this.chatTab.addMessage(chatMessage);
+      let text = this.palette.evaluate(this.text, this.character.rootDataElement);
+      this.chatMessageService.sendMessage(this.chatTab, text, this.gameType, this.character.identifier, this.sendTo);
     }
     this.text = '';
     this.previousWritingLength = this.text.length;
@@ -211,6 +211,23 @@ export class ChatPaletteComponent implements OnInit, OnDestroy {
     textArea.style.height = '';
     if (textArea.scrollHeight >= textArea.offsetHeight) {
       textArea.style.height = textArea.scrollHeight + 'px';
+    }
+  }
+
+  private allowsChat(gameCharacter: GameCharacter): boolean {
+    switch (gameCharacter.location.name) {
+      case 'table':
+      case this.myPeer.peerId:
+        return true;
+      case 'graveyard':
+        return false;
+      default:
+        for (const conn of Network.peerContexts) {
+          if (conn.isOpen && gameCharacter.location.name === conn.fullstring) {
+            return false;
+          }
+        }
+        return true;
     }
   }
 }

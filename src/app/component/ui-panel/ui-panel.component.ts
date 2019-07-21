@@ -1,4 +1,4 @@
-import { animate, keyframes, state, style, transition, trigger } from '@angular/animations';
+import { animate, keyframes, style, transition, trigger } from '@angular/animations';
 import {
   AfterViewInit,
   Component,
@@ -23,7 +23,6 @@ import { PointerDeviceService } from 'service/pointer-device.service';
   ],
   animations: [
     trigger('flyInOut', [
-      state('in', style({ transform: 'scale(1, 1)' })),
       transition('void => *', [
         animate('100ms ease-out', keyframes([
           style({ transform: 'scale(0.8, 0.8)', opacity: '0', offset: 0 }),
@@ -33,22 +32,13 @@ import { PointerDeviceService } from 'service/pointer-device.service';
       transition('* => void', [
         animate(100, style({ transform: 'scale(0, 0)' }))
       ])
-    ]),
-    trigger('bgInOut', [
-      state('in', style({ 'background-color': 'rgba(30, 30, 30, 0.3)' })),
-      transition('void => *', [
-        style({ 'background-color': 'rgba(30, 30, 30, 0.0)' }), animate(200)
-      ]),
-      transition('* => void', [
-        animate(200, style({ 'background-color': 'rgba(30, 30, 30, 0.0)' }))
-      ])
-    ]),
+    ])
   ]
 })
 export class UIPanelComponent implements OnInit, OnDestroy, AfterViewInit {
-  @ViewChild('draggablePanel') draggablePanel: ElementRef;
-  @ViewChild('scrollablePanel') scrollablePanel: ElementRef;
-  @ViewChild('content', { read: ViewContainerRef }) content: ViewContainerRef;
+  @ViewChild('draggablePanel', { static: true }) draggablePanel: ElementRef;
+  @ViewChild('scrollablePanel', { static: true }) scrollablePanel: ElementRef;
+  @ViewChild('content', { read: ViewContainerRef, static: true }) content: ViewContainerRef;
 
   @Input() set title(title: string) { this.panelService.title = title; }
   @Input() set left(left: number) { this.panelService.left = left; }
@@ -148,7 +138,6 @@ export class UIPanelComponent implements OnInit, OnDestroy, AfterViewInit {
   private onScrollablePanelMouseDown(e: MouseEvent) {
     if (e.target === this.scrollablePanel.nativeElement) {
       if (e.offsetX >= this.scrollablePanel.nativeElement.clientWidth || e.offsetY >= this.scrollablePanel.nativeElement.clientHeight) {
-        console.log('scrollbar clicked');
         this.$draggablePanel.draggable('option', 'handle', '.draggable-panel');
         document.body.addEventListener('mouseup', this.callbackOnMouseUp, false);
         return;
@@ -158,12 +147,10 @@ export class UIPanelComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   private onDraggablePanelMouseDown(e: MouseEvent) {
-    console.log('onDraggablePanelMouseDown');
     this.setForeground();
   }
 
   private onMouseUp(e: any) {
-    console.log('onMouseUp');
     this.$draggablePanel.draggable('option', 'handle', false);
     document.body.removeEventListener('mouseup', this.callbackOnMouseUp, false);
   }
@@ -174,10 +161,8 @@ export class UIPanelComponent implements OnInit, OnDestroy, AfterViewInit {
       && this.$draggablePanel.outerWidth() >= window.innerWidth
       && this.$draggablePanel.outerHeight() >= window.innerHeight) {
       this.isFullScreen = false;
-      console.log('通常');
     } else {
       this.isFullScreen = true;
-      console.log('最大化');
     }
 
     if (this.isFullScreen) {

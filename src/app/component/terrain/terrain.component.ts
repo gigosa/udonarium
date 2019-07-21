@@ -1,10 +1,10 @@
-import { AfterViewInit, Component, HostListener, Input, OnDestroy, OnInit } from '@angular/core';
-
+import { AfterViewInit, ChangeDetectionStrategy, ChangeDetectorRef, Component, HostListener, Input, OnDestroy, OnInit } from '@angular/core';
 import { ImageFile } from '@udonarium/core/file-storage/image-file';
+import { ObjectNode } from '@udonarium/core/synchronize-object/object-node';
+import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem } from '@udonarium/core/system';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { Terrain, TerrainViewState } from '@udonarium/terrain';
-
 import { GameCharacterSheetComponent } from 'component/game-character-sheet/game-character-sheet.component';
 import { MovableOption } from 'directive/movable.directive';
 import { RotableOption } from 'directive/rotable.directive';
@@ -16,7 +16,8 @@ import { TabletopService } from 'service/tabletop.service';
 @Component({
   selector: 'terrain',
   templateUrl: './terrain.component.html',
-  styleUrls: ['./terrain.component.css']
+  styleUrls: ['./terrain.component.css'],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class TerrainComponent implements OnInit, OnDestroy, AfterViewInit {
   @Input() terrain: Terrain = null;
@@ -47,10 +48,25 @@ export class TerrainComponent implements OnInit, OnDestroy, AfterViewInit {
     private tabletopService: TabletopService,
     private contextMenuService: ContextMenuService,
     private panelService: PanelService,
+    private changeDetector: ChangeDetectorRef,
     private pointerDeviceService: PointerDeviceService
   ) { }
 
   ngOnInit() {
+    EventSystem.register(this)
+      .on('UPDATE_GAME_OBJECT', -1000, event => {
+        let object = ObjectStore.instance.get(event.data.identifier);
+        if (!this.terrain || !object) return;
+        if (this.terrain === object || (object instanceof ObjectNode && this.terrain.contains(object))) {
+          this.changeDetector.markForCheck();
+        }
+      })
+      .on('SYNCHRONIZE_FILE_LIST', event => {
+        this.changeDetector.markForCheck();
+      })
+      .on('UPDATE_FILE_RESOURE', -1000, event => {
+        this.changeDetector.markForCheck();
+      });
     this.movableOption = {
       tabletopObject: this.terrain,
       colideLayers: ['terrain']
@@ -68,14 +84,12 @@ export class TerrainComponent implements OnInit, OnDestroy, AfterViewInit {
 
   @HostListener('dragstart', ['$event'])
   onDragstart(e) {
-    console.log('Dragstart Cancel !!!!');
     e.stopPropagation();
     e.preventDefault();
   }
 
   @HostListener('mousedown', ['$event'])
   onDragMouseDown(e: any) {
-    console.log('TerrainComponent mousedown !!!');
     e.preventDefault();
 
     // TODO:もっと良い方法考える
@@ -86,7 +100,6 @@ export class TerrainComponent implements OnInit, OnDestroy, AfterViewInit {
 
   @HostListener('contextmenu', ['$event'])
   onContextMenu(e: Event) {
-    console.log('Terrein onContextMenu', this.pointerDeviceService.isAllowedToOpenContextMenu);
     e.stopPropagation();
     e.preventDefault();
 
@@ -94,22 +107,22 @@ export class TerrainComponent implements OnInit, OnDestroy, AfterViewInit {
 
     let menuPosition = this.pointerDeviceService.pointers[0];
     let objectPosition = this.tabletopService.calcTabletopLocalCoordinate();
-    console.log('mouseCursor', menuPosition);
     this.contextMenuService.open(menuPosition, [
       (this.isLocked
         ? {
           name: '固定解除', action: () => {
             this.isLocked = false;
             this.terrain.update();
-            SoundEffect.play(PresetSound.switch);
+            SoundEffect.play(PresetSound.unlock);
           }
         } : {
           name: '固定する', action: () => {
             this.isLocked = true;
             this.terrain.update();
-            SoundEffect.play(PresetSound.switch);
+            SoundEffect.play(PresetSound.lock);
           }
         }),
+      ContextMenuSeparator,
       (this.hasWall
         ? {
           name: '壁を非表示', action: () => {
@@ -129,18 +142,17 @@ export class TerrainComponent implements OnInit, OnDestroy, AfterViewInit {
       {
         name: 'コピーを作る', action: () => {
           let cloneObject = this.terrain.clone();
-          console.log('コピー', cloneObject);
           cloneObject.location.x += this.gridSize;
           cloneObject.location.y += this.gridSize;
           cloneObject.isLocked = false;
           if (this.terrain.parent) this.terrain.parent.appendChild(cloneObject);
-          SoundEffect.play(PresetSound.lock);
+          SoundEffect.play(PresetSound.blockPut);
         }
       },
       {
         name: '削除する', action: () => {
           this.terrain.destroy();
-          SoundEffect.play(PresetSound.delete);
+          SoundEffect.play(PresetSound.sweep);
         }
       },
       ContextMenuSeparator,
@@ -149,11 +161,11 @@ export class TerrainComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   onMove() {
-    SoundEffect.play(PresetSound.lock);
+    SoundEffect.play(PresetSound.blockPick);
   }
 
   onMoved() {
-    SoundEffect.play(PresetSound.lock);
+    SoundEffect.play(PresetSound.blockPut);
   }
 
   private adjustMinBounds(value: number, min: number = 0): number {
@@ -161,7 +173,6 @@ export class TerrainComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   private showDetail(gameObject: Terrain) {
-    console.log('onSelectedGameObject <' + gameObject.aliasName + '>', gameObject.identifier);
     EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: gameObject.identifier, className: gameObject.aliasName });
     let coordinate = this.pointerDeviceService.pointers[0];
     let title = '地形設定';

@@ -27,6 +27,9 @@ type LocationName = string;
 export class TabletopService {
   dragAreaElement: HTMLElement = document.body;
 
+  private batchTask: Map<any, Function> = new Map();
+  private batchTaskTimer: NodeJS.Timer = null;
+
   private _emptyTable: GameTable = new GameTable('');
   get tableSelecter(): TableSelecter { return ObjectStore.instance.get<TableSelecter>('tableSelecter'); }
   get currentTable(): GameTable {
@@ -35,9 +38,10 @@ export class TabletopService {
   }
 
   private locationMap: Map<ObjectIdentifier, LocationName> = new Map();
-  private characterCache = new TabletopCache<GameCharacter>(() => ObjectStore.instance.getObjects(GameCharacter).filter(obj => obj.location.name === 'table'));
-  private cardCache = new TabletopCache<Card>(() => ObjectStore.instance.getObjects(Card).filter(obj => obj.location.name === 'table'));
-  private cardStackCache = new TabletopCache<CardStack>(() => ObjectStore.instance.getObjects(CardStack).filter(obj => obj.location.name === 'table'));
+  private parentMap: Map<ObjectIdentifier, ObjectIdentifier> = new Map();
+  private characterCache = new TabletopCache<GameCharacter>(() => ObjectStore.instance.getObjects(GameCharacter).filter(obj => obj.isVisibleOnTable));
+  private cardCache = new TabletopCache<Card>(() => ObjectStore.instance.getObjects(Card).filter(obj => obj.isVisibleOnTable));
+  private cardStackCache = new TabletopCache<CardStack>(() => ObjectStore.instance.getObjects(CardStack).filter(obj => obj.isVisibleOnTable));
   private tableMaskCache = new TabletopCache<GameTableMask>(() => {
     let viewTable = this.tableSelecter.viewTable;
     return viewTable ? viewTable.masks : [];
@@ -78,9 +82,9 @@ export class TabletopService {
         let object = ObjectStore.instance.get(event.data.identifier);
         if (!object || !(object instanceof TabletopObject)) {
           this.refreshCache(event.data.aliasName);
-        } else if (this.locationMap.get(object.identifier) !== object.location.name) {
+        } else if (this.shouldRefreshCache(object)) {
           this.refreshCache(event.data.aliasName);
-          this.locationMap.set(object.identifier, object.location.name);
+          this.updateMap(object);
         }
       })
       .on('DELETE_GAME_OBJECT', -1000, event => {
@@ -102,9 +106,28 @@ export class TabletopService {
           gameObject.posZ = pointer.z;
           this.placeToTabletop(gameObject);
           gameObject.update();
-          SoundEffect.play(PresetSound.put);
+          SoundEffect.play(PresetSound.piecePut);
         }
       });
+  }
+
+  addBatch(task: Function, key: any = {}) {
+    this.batchTask.set(key, task);
+    if (this.batchTaskTimer != null) return;
+    this.execBatch();
+    this.batchTaskTimer = setInterval(() => {
+      if (0 < this.batchTask.size) {
+        this.execBatch();
+      } else {
+        clearInterval(this.batchTaskTimer);
+        this.batchTaskTimer = null;
+      }
+    }, 66);
+  }
+
+  private execBatch() {
+    this.batchTask.forEach(task => task());
+    this.batchTask.clear();
   }
 
   private findCache(aliasName: string): TabletopCache<any> {
@@ -142,7 +165,21 @@ export class TabletopService {
     this.textNoteCache.refresh();
     this.diceSymbolCache.refresh();
 
+    this.clearMap();
+  }
+
+  private shouldRefreshCache(object: TabletopObject) {
+    return this.locationMap.get(object.identifier) !== object.location.name || this.parentMap.get(object.identifier) !== object.parentId;
+  }
+
+  private updateMap(object: TabletopObject) {
+    this.locationMap.set(object.identifier, object.location.name);
+    this.parentMap.set(object.identifier, object.parentId);
+  }
+
+  private clearMap() {
     this.locationMap.clear();
+    this.parentMap.clear();
   }
 
   private placeToTabletop(gameObject: TabletopObject) {
@@ -176,7 +213,7 @@ export class TabletopService {
   }
 
   createGameCharacter(position: PointerCoordinate): GameCharacter {
-    let character = GameCharacter.createGameCharacter('新しいキャラクター', 1, '');
+    let character = GameCharacter.create('新しいキャラクター', 1, '');
     character.location.x = position.x - 25;
     character.location.y = position.y - 25;
     character.posZ = position.z;
@@ -222,7 +259,6 @@ export class TabletopService {
   }
 
   createDiceSymbol(position: PointerCoordinate, name: string, diceType: DiceType, imagePathPrefix: string): DiceSymbol {
-    console.log('createDiceSymbol');
     let diceSymbol = DiceSymbol.create(name, diceType, 1);
     let image: ImageFile = null;
 
@@ -259,7 +295,7 @@ export class TabletopService {
         if (!ImageStorage.instance.get(url)) {
           ImageStorage.instance.add(url);
         }
-        let card = Card.create('サンプルカード', url, back);
+        let card = Card.create('カード', url, back);
         cardStack.putOnBottom(card);
       }
     }
@@ -270,7 +306,7 @@ export class TabletopService {
       if (!ImageStorage.instance.get(url)) {
         ImageStorage.instance.add(url);
       }
-      let card = Card.create('サンプルカード', url, back);
+      let card = Card.create('カード', url, back);
       cardStack.putOnBottom(card);
     }
     return cardStack;
@@ -303,7 +339,7 @@ export class TabletopService {
       name: 'キャラクターを作成', action: () => {
         let character = this.createGameCharacter(position);
         EventSystem.trigger('SELECT_TABLETOP_OBJECT', { identifier: character.identifier, className: character.aliasName });
-        SoundEffect.play(PresetSound.put);
+        SoundEffect.play(PresetSound.piecePut);
       }
     }
   }
@@ -312,7 +348,7 @@ export class TabletopService {
     return {
       name: 'マップマスクを作成', action: () => {
         this.createGameTableMask(position);
-        SoundEffect.play(PresetSound.put);
+        SoundEffect.play(PresetSound.cardPut);
       }
     }
   }
@@ -321,7 +357,7 @@ export class TabletopService {
     return {
       name: '地形を作成', action: () => {
         this.createTerrain(position);
-        SoundEffect.play(PresetSound.lock);
+        SoundEffect.play(PresetSound.blockPut);
       }
     }
   }
@@ -330,7 +366,7 @@ export class TabletopService {
     return {
       name: '共有メモを作成', action: () => {
         this.createTextNote(position);
-        SoundEffect.play(PresetSound.put);
+        SoundEffect.play(PresetSound.cardPut);
       }
     }
   }
@@ -360,7 +396,7 @@ export class TabletopService {
       subMenus.push({
         name: item.menuName, action: () => {
           this.createDiceSymbol(position, item.diceName, item.type, item.imagePathPrefix);
-          SoundEffect.play(PresetSound.put);
+          SoundEffect.play(PresetSound.dicePut);
         }
       });
     });
@@ -376,6 +412,7 @@ class TabletopCache<T extends TabletopObject> {
     if (this.needsRefresh) {
       this._objects = this.refreshCollector();
       this._objects = this._objects ? this._objects : [];
+      this.needsRefresh = false;
     }
     return this._objects;
   }

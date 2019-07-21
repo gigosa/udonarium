@@ -20,6 +20,8 @@ import { EventSystem } from '@udonarium/core/system';
 
 import { PanelService } from 'service/panel.service';
 
+const DEFAULT_MESSAGE_LENGTH = 100;
+
 @Component({
   selector: 'chat-tab',
   templateUrl: './chat-tab.component.html',
@@ -27,7 +29,7 @@ import { PanelService } from 'service/panel.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnChanges, AfterViewChecked {
-  maxMessages: number = 20;
+  maxMessages: number = 0;
   preScrollBottom: number = -1;
 
   sampleMessages: ChatMessageContext[] = [
@@ -61,6 +63,8 @@ export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnCha
 
   private callbackOnScroll: any = (e) => this.onScroll(e);
 
+  private asyncMessagesInitializeTimer: NodeJS.Timer;
+
   @Input() chatTab: ChatTab;
   @Output() onAddMessage: EventEmitter<null> = new EventEmitter();
 
@@ -89,13 +93,16 @@ export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnCha
     this.sampleMessages = messages;
 
     EventSystem.register(this)
-      .on('UPDATE_GAME_OBJECT', -1000, event => {
-        let object = ObjectStore.instance.get(event.data.identifier);
-        if (object && object instanceof ChatMessage && object.parent === this.chatTab) {
+      .on('MESSAGE_ADDED', event => {
+        let message = ObjectStore.instance.get<ChatMessage>(event.data.messageIdentifier);
+        if (message && message.parent === this.chatTab) {
           if (!this.needUpdate) this.changeDetector.markForCheck();
           this.needUpdate = true;
           this.maxMessages += 1;
         }
+      })
+      .on('UPDATE_GAME_OBJECT', event => {
+        if (event.data.aliasName === ChatMessage.aliasName) this.changeDetector.markForCheck();
       });
   }
 
@@ -114,7 +121,18 @@ export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnCha
 
   ngOnChanges() {
     this.needUpdate = true;
-    this.maxMessages = 20;
+    this.maxMessages = 10;
+
+    clearInterval(this.asyncMessagesInitializeTimer);
+    let length = DEFAULT_MESSAGE_LENGTH;
+    this.asyncMessagesInitializeTimer = setInterval(() => {
+      if (this.hasMany && 0 < length) {
+        length -= 10;
+        this.moreMessages(10);
+      } else {
+        clearInterval(this.asyncMessagesInitializeTimer);
+      }
+    }, 0);
   }
 
   ngAfterViewChecked() {
@@ -133,10 +151,6 @@ export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnCha
     this.changeDetector.markForCheck();
     this.needUpdate = true;
 
-    EventSystem.trigger('BROADCAST_MESSAGE', {
-      from: '', name: '', text: '', timestamp: 0, tag: '', imageIdentifier: '', responseIdentifier: '',
-    });
-
     this.preScrollBottom = this.panelService.scrollablePanel.scrollHeight - this.panelService.scrollablePanel.scrollTop;
   }
 
@@ -150,7 +164,7 @@ export class ChatTabComponent implements OnInit, AfterViewInit, OnDestroy, OnCha
 
   private onScroll(e: Event) {
     if (this.hasMany && this.panelService.scrollablePanel.scrollTop <= 200) {
-      this.moreMessages(4);
+      this.moreMessages(8);
       this.ngZone.run(() => { });
     } else if (this.chatTab.hasUnread) {
       let top = this.panelService.scrollablePanel.scrollHeight - this.panelService.scrollablePanel.clientHeight;
