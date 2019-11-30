@@ -74,12 +74,12 @@ export class TooltipDirective implements OnInit, AfterViewInit, OnDestroy {
 
     this.openTooltipTimer = setTimeout(() => {
       let magnitude = (pointerX - this.pointerDeviceService.pointerX) ** 2 + (pointerY - this.pointerDeviceService.pointerY) ** 2;
-      if (9 < magnitude) {
+      if (4 < magnitude) {
         this.startOpenTimer();
       } else {
         this.ngZone.run(() => this.open());
       }
-    }, 150);
+    }, 100);
   }
 
   private startCloseTimer() {
@@ -114,7 +114,8 @@ export class TooltipDirective implements OnInit, AfterViewInit, OnDestroy {
 
     this.addEventListeners(this.tooltipComponentRef.location.nativeElement);
     this.ngZone.runOutsideAngular(() => {
-      document.body.addEventListener('mousedown', this.callbackOnMouseDown, false);
+      document.body.addEventListener('touchstart', this.callbackOnMouseDown, true);
+      document.body.addEventListener('mousedown', this.callbackOnMouseDown, true);
     });
 
     EventSystem.register(this)
@@ -124,7 +125,8 @@ export class TooltipDirective implements OnInit, AfterViewInit, OnDestroy {
 
     this.tooltipComponentRef.onDestroy(() => {
       this.removeEventListeners(this.tooltipComponentRef.location.nativeElement);
-      document.body.removeEventListener('mousedown', this.callbackOnMouseDown, false);
+      document.body.removeEventListener('touchstart', this.callbackOnMouseDown, true);
+      document.body.removeEventListener('mousedown', this.callbackOnMouseDown, true);
       this.clearTimer();
       this.tooltipComponentRef = null;
       EventSystem.unregister(this);

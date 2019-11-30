@@ -6,7 +6,7 @@ import { ImageFile, ImageState } from '@udonarium/core/file-storage/image-file';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { MimeType } from '@udonarium/core/file-storage/mime-type';
 import { GameObject } from '@udonarium/core/synchronize-object/game-object';
-import { XmlUtil } from '@udonarium/core/synchronize-object/xml-util';
+import { XmlUtil } from '@udonarium/core/system/util/xml-util';
 import { DataSummarySetting } from '@udonarium/data-summary-setting';
 import { Room } from '@udonarium/room';
 
@@ -43,23 +43,24 @@ export class SaveDataService {
   }
 
   private convertToXml(gameObject: GameObject): string {
-    return Beautify.xml(gameObject.toXml(), 2);
+    let xmlDeclaration = '<?xml version="1.0" encoding="UTF-8"?>';
+    return xmlDeclaration + '\n' + Beautify.xml(gameObject.toXml(), 2);
   }
 
   private searchImageFiles(xml: string): File[] {
-    let xmlElement: Element = XmlUtil.xml2element('<root>' + xml + '</root>');
+    let xmlElement: Element = XmlUtil.xml2element(xml);
     let files: File[] = [];
     if (!xmlElement) return files;
 
     let images: { [identifier: string]: ImageFile } = {};
-    let imageElements = xmlElement.querySelectorAll('*[type="image"]');
+    let imageElements = xmlElement.ownerDocument.querySelectorAll('*[type="image"]');
 
     for (let i = 0; i < imageElements.length; i++) {
       let identifier = imageElements[i].innerHTML;
       images[identifier] = ImageStorage.instance.get(identifier);
     }
 
-    imageElements = xmlElement.querySelectorAll('*[imageIdentifier], *[backgroundImageIdentifier]');
+    imageElements = xmlElement.ownerDocument.querySelectorAll('*[imageIdentifier], *[backgroundImageIdentifier]');
 
     for (let i = 0; i < imageElements.length; i++) {
       let identifier = imageElements[i].getAttribute('imageIdentifier');

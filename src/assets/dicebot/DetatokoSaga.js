@@ -18,9 +18,9 @@
   function $rb_times(lhs, rhs) {
     return (typeof(lhs) === 'number' && typeof(rhs) === 'number') ? lhs * rhs : lhs['$*'](rhs);
   }
-  var self = Opal.top, $nesting = [], nil = Opal.nil, $breaker = Opal.breaker, $slice = Opal.slice, $klass = Opal.klass, $send = Opal.send, $truthy = Opal.truthy, $gvars = Opal.gvars;
+  var self = Opal.top, $nesting = [], nil = Opal.nil, $breaker = Opal.breaker, $slice = Opal.slice, $klass = Opal.klass, $send = Opal.send, $truthy = Opal.truthy;
 
-  Opal.add_stubs(['$setPrefixes', '$debug', '$checkRoll', '$empty?', '$checkJudgeValue', '$rollTableCommand', '$=~', '$to_i', '$nil?', '$getRollResult', '$+', '$getSuccess', '$getCheckFlagResult', '$==', '$times', '$roll', '$[]=', '$join', '$sort', '$!=', '$reverse', '$[]', '$>=', '$>', '$getDownWill', '$getModifyText', '$getTotalResultValue', '$===', '$-', '$getTotalResultValueWhenSlash', '$ceil', '$/', '$*', '$upcase', '$choiceStrengthStigmaTable', '$choiceWillStigmaTable', '$choiceStrengthBadEndTable', '$choiceWillBadEndTable', '$get_table_by_2d6']);
+  Opal.add_stubs(['$setPrefixes', '$debug', '$checkRoll', '$empty?', '$checkJudgeValue', '$rollTableCommand', '$=~', '$to_i', '$last_match', '$nil?', '$getRollResult', '$+', '$getSuccess', '$getCheckFlagResult', '$==', '$times', '$roll', '$[]=', '$join', '$sort', '$!=', '$reverse', '$[]', '$>=', '$>', '$getDownWill', '$getModifyText', '$getTotalResultValue', '$===', '$-', '$getTotalResultValueWhenSlash', '$ceil', '$/', '$*', '$upcase', '$choiceStrengthStigmaTable', '$choiceWillStigmaTable', '$choiceStrengthBadEndTable', '$choiceWillBadEndTable', '$get_table_by_2d6']);
   return (function($base, $super, $parent_nesting) {
     function $DetatokoSaga(){};
     var self = $DetatokoSaga = $klass($base, $super, 'DetatokoSaga', $DetatokoSaga);
@@ -93,11 +93,11 @@
         return ""
       };
       target = 8;
-      skill = (($a = $gvars['~']) === nil ? nil : $a['$[]'](1)).$to_i();
-      flag = (($a = $gvars['~']) === nil ? nil : $a['$[]'](2)).$to_i();
-      if ($truthy((($a = $gvars['~']) === nil ? nil : $a['$[]'](5))['$nil?']())) {
+      skill = Opal.const_get_relative($nesting, 'Regexp').$last_match(1).$to_i();
+      flag = Opal.const_get_relative($nesting, 'Regexp').$last_match(2).$to_i();
+      if ($truthy(Opal.const_get_relative($nesting, 'Regexp').$last_match(5)['$nil?']())) {
         } else {
-        target = (($a = $gvars['~']) === nil ? nil : $a['$[]'](5)).$to_i()
+        target = Opal.const_get_relative($nesting, 'Regexp').$last_match(5).$to_i()
       };
       result = "" + "判定！　スキルレベル：" + (skill) + "　フラグ：" + (flag) + "　目標値：" + (target);
       $b = self.$getRollResult(skill), $a = Opal.to_ary($b), (total = ($a[0] == null ? nil : $a[0])), (rollText = ($a[1] == null ? nil : $a[1])), $b;
@@ -113,7 +113,7 @@
 
       
       diceCount = $rb_plus(skill, 1);
-      if ($truthy(skill['$=='](0))) {
+      if (skill['$=='](0)) {
         diceCount = 3};
       dice = [];
       $send(diceCount, 'times', [], (TMP_7 = function(i){var self = TMP_7.$$s || this, $a, $b;
@@ -167,10 +167,10 @@ if (i == null) i = nil;
         } else {
         return ""
       };
-      skill = (($a = $gvars['~']) === nil ? nil : $a['$[]'](1)).$to_i();
-      flag = (($a = $gvars['~']) === nil ? nil : $a['$[]'](2)).$to_i();
-      operator = (($a = $gvars['~']) === nil ? nil : $a['$[]'](4));
-      value = (($a = $gvars['~']) === nil ? nil : $a['$[]'](5)).$to_i();
+      skill = Opal.const_get_relative($nesting, 'Regexp').$last_match(1).$to_i();
+      flag = Opal.const_get_relative($nesting, 'Regexp').$last_match(2).$to_i();
+      operator = Opal.const_get_relative($nesting, 'Regexp').$last_match(4);
+      value = Opal.const_get_relative($nesting, 'Regexp').$last_match(5).$to_i();
       result = "" + "判定！　スキルレベル：" + (skill) + "　フラグ：" + (flag);
       modifyText = self.$getModifyText(operator, value);
       if ($truthy(modifyText['$empty?']())) {
@@ -213,7 +213,7 @@ if (i == null) i = nil;
       var self = this, quotient = nil, result = nil;
 
       
-      if ($truthy(value['$=='](0))) {
+      if (value['$=='](0)) {
         return "0では割れません"};
       quotient = $rb_divide($rb_times(1.0, total), value).$ceil();
       result = "" + (total) + "÷" + (value) + " ＞ 判定値：" + (quotient);

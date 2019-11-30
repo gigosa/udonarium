@@ -12,9 +12,9 @@
   function $rb_ge(lhs, rhs) {
     return (typeof(lhs) === 'number' && typeof(rhs) === 'number') ? lhs >= rhs : lhs['$>='](rhs);
   }
-  var self = Opal.top, $nesting = [], nil = Opal.nil, $breaker = Opal.breaker, $slice = Opal.slice, $klass = Opal.klass, $send = Opal.send, $truthy = Opal.truthy, $gvars = Opal.gvars, $hash2 = Opal.hash2;
+  var self = Opal.top, $nesting = [], nil = Opal.nil, $breaker = Opal.breaker, $slice = Opal.slice, $klass = Opal.klass, $send = Opal.send, $truthy = Opal.truthy, $hash2 = Opal.hash2;
 
-  Opal.add_stubs(['$judgeRoll', '$nil?', '$upcase', '$===', '$getRandomSkillTableResult', '$getTableDiceCommandResult', '$=~', '$to_i', '$==', '$getChangedModifyText', '$[]', '$parren_killer', '$+', '$roll', '$collect', '$split', '$min', '$<=', '$length', '$first', '$check_success', '$each_with_index', '$clone', '$delete_at', '$max', '$-', '$<<', '$uniq!', '$join', '$each', '$>=', '$check_hit', '$bcdice', '$get_table_by_2d6', '$get_table_by_1d6', '$getD66Table', '$get_table_by_d66_swap', '$raise', '$map', '$kind_of?', '$!=', '$size', '$inspect', '$setPrefixes', '$keys']);
+  Opal.add_stubs(['$judgeRoll', '$nil?', '$upcase', '$===', '$getRandomSkillTableResult', '$getTableDiceCommandResult', '$=~', '$last_match', '$to_i', '$==', '$getChangedModifyText', '$[]', '$parren_killer', '$+', '$roll', '$collect', '$split', '$min', '$<=', '$length', '$first', '$check_success', '$each_with_index', '$clone', '$delete_at', '$max', '$-', '$<<', '$uniq!', '$join', '$each', '$>=', '$check_hit', '$bcdice', '$get_table_by_2d6', '$get_table_by_1d6', '$getD66Table', '$get_table_by_d66_swap', '$raise', '$map', '$is_a?', '$!=', '$size', '$inspect', '$setPrefixes', '$keys']);
   return (function($base, $super, $parent_nesting) {
     function $HatsuneMiku(){};
     var self = $HatsuneMiku = $klass($base, $super, 'HatsuneMiku', $HatsuneMiku);
@@ -52,7 +52,7 @@
     Opal.defn(self, '$getHelpMessage', TMP_HatsuneMiku_getHelpMessage_4 = function $$getHelpMessage() {
       var self = this;
 
-      return "" + "・判定(Rx±y@z>=t)\n" + "　能力値のダイスごとに成功・失敗の判定を行います。\n" + "　x：能力ランク(S,A～D)。数字指定で直接その個数のダイスが振れます\n" + "　y：修正値。A+2 あるいは A++ のように表記。混在時は A++,+1 のように記述も可能\n" + "　z：スペシャル最低値（省略：6）　t：目標値（省略：4）\n" + "　　例） RA　R2　RB+1　RC++　RD+,+2　RA>=5　RS-1@5>=6\n" + "　結果はネイロを取得した残りで最大値を表示\n" + "例） RB \n" + "　HatsuneMiku : (RB>=4) ＞ [3,5] ＞ \n" + "　　ネイロに3(青)を取得した場合 5:成功\n" + "　　ネイロに5(白)を取得した場合 3:失敗\n" + "・各種表\n" + "　ファンブル表 FT／致命傷表 CWT／休憩表 BT／目標表 TT／関係表 RT\n" + "　障害表 OT／リクエスト表 RQT／情景表 ST\n" + "・キーワード表\n" + "　ダーク DKT／ホット HKT／ラブ LKT／エキセントリック EKT／メランコリー MKT\n" + "・名前表 NT\n" + "　コア別　ダーク DNT／ホット HNT／ラブ LNT／エキセントリック ENT／メランコリー MNT\n" + "・オトダマ各種表\n" + "　性格表A OPA／性格表B OPB／趣味表 OHT／外見表 OLT／一人称表 OIT／呼び名表 OYT\n" + "　リアクション表 ORT／出会い表 OMT\n"
+      return "" + "・判定(Rx±y@z>=t)\n" + "　能力値のダイスごとに成功・失敗の判定を行います。\n" + "　x：能力ランク(S,A～D)。数字指定で直接その個数のダイスが振れます\n" + "　y：修正値。A+2 あるいは A++ のように表記。混在時は A++,+1 のように記述も可能\n" + "　z：スペシャル最低値（省略：6）　t：目標値（省略：4）\n" + "　　例） RA　R2　RB+1　RC++　RD+,+2　RA>=5　RS-1@5>=6\n" + "　結果はネイロを取得した残りで最大値を表示\n" + "例） RB\n" + "　HatsuneMiku : (RB>=4) ＞ [3,5] ＞\n" + "　　ネイロに3(青)を取得した場合 5:成功\n" + "　　ネイロに5(白)を取得した場合 3:失敗\n" + "・各種表\n" + "　ファンブル表 FT／致命傷表 CWT／休憩表 BT／目標表 TT／関係表 RT\n" + "　障害表 OT／リクエスト表 RQT／情景表 ST\n" + "・キーワード表\n" + "　ダーク DKT／ホット HKT／ラブ LKT／エキセントリック EKT／メランコリー MKT\n" + "・名前表 NT\n" + "　コア別　ダーク DNT／ホット HNT／ラブ LNT／エキセントリック ENT／メランコリー MNT\n" + "・オトダマ各種表\n" + "　性格表A OPA／性格表B OPB／趣味表 OHT／外見表 OLT／一人称表 OIT／呼び名表 OYT\n" + "　リアクション表 ORT／出会い表 OMT\n"
     }, TMP_HatsuneMiku_getHelpMessage_4.$$arity = 0);
     
     Opal.defn(self, '$rollDiceCommand', TMP_HatsuneMiku_rollDiceCommand_5 = function $$rollDiceCommand(command) {
@@ -78,20 +78,20 @@
         } else {
         return nil
       };
-      skillRank = (($a = $gvars['~']) === nil ? nil : $a['$[]'](2));
-      modifyText = (($a = $gvars['~']) === nil ? nil : $a['$[]'](3));
-      signOfInequality = (function() {if ($truthy((($a = $gvars['~']) === nil ? nil : $a['$[]'](7))['$nil?']())) {
+      skillRank = Opal.const_get_relative($nesting, 'Regexp').$last_match(2);
+      modifyText = Opal.const_get_relative($nesting, 'Regexp').$last_match(3);
+      signOfInequality = (function() {if ($truthy(Opal.const_get_relative($nesting, 'Regexp').$last_match(7)['$nil?']())) {
         return ">="
         } else {
-        return (($a = $gvars['~']) === nil ? nil : $a['$[]'](7))
+        return Opal.const_get_relative($nesting, 'Regexp').$last_match(7)
       }; return nil; })();
-      targetText = (function() {if ($truthy((($a = $gvars['~']) === nil ? nil : $a['$[]'](9))['$nil?']())) {
+      targetText = (function() {if ($truthy(Opal.const_get_relative($nesting, 'Regexp').$last_match(9)['$nil?']())) {
         return "4"
         } else {
-        return (($a = $gvars['~']) === nil ? nil : $a['$[]'](9))
+        return Opal.const_get_relative($nesting, 'Regexp').$last_match(9)
       }; return nil; })();
-      specialNum = (($a = $gvars['~']) === nil ? nil : $a['$[]'](5));
-      specialNum = ($truthy($a = specialNum) ? $a : (($b = $gvars['~']) === nil ? nil : $b['$[]'](11)));
+      specialNum = Opal.const_get_relative($nesting, 'Regexp').$last_match(5);
+      specialNum = ($truthy($a = specialNum) ? $a : Opal.const_get_relative($nesting, 'Regexp').$last_match(11));
       specialNum = ($truthy($a = specialNum) ? $a : 6);
       specialNum = specialNum.$to_i();
       specialText = (function() {if (specialNum['$=='](6)) {
@@ -112,7 +112,7 @@
       diceList = $send(diceText.$split(/,/), 'collect', [], (TMP_6 = function(i){var self = TMP_6.$$s || this;
 if (i == null) i = nil;
       return i.$to_i()}, TMP_6.$$s = self, TMP_6.$$arity = 1, TMP_6));
-      if ($truthy(skillRank['$==']("D"))) {
+      if (skillRank['$==']("D")) {
         diceList = [diceList.$min()]};
       message = "" + "(" + (commandText) + (specialText) + (signOfInequality) + (targetText) + ") ＞ [" + (diceText) + "]" + (modifyText) + " ＞ ";
       if ($truthy($rb_le(diceList.$length(), 1))) {
@@ -160,7 +160,7 @@ if (value == null) value = nil;
       var self = this, success = nil;
 
       
-      if ($truthy(dice_n['$=='](1))) {
+      if (dice_n['$=='](1)) {
         return "ファンブル"};
       if ($truthy($rb_ge(dice_n, special_n))) {
         return "スペシャル"};
@@ -198,8 +198,8 @@ if (value == null) value = nil;
       
       newTable = $send(table, 'map', [], (TMP_13 = function(item){var self = TMP_13.$$s || this, $a;
 if (item == null) item = nil;
-      if ($truthy(($truthy($a = item['$kind_of?'](Opal.const_get_relative($nesting, 'String'))) ? /^(\d+):(.*)/['$==='](item) : $a))) {
-          return [(($a = $gvars['~']) === nil ? nil : $a['$[]'](1)).$to_i(), (($a = $gvars['~']) === nil ? nil : $a['$[]'](2))]
+      if ($truthy(($truthy($a = item['$is_a?'](Opal.const_get_relative($nesting, 'String'))) ? /^(\d+):(.*)/['$==='](item) : $a))) {
+          return [Opal.const_get_relative($nesting, 'Regexp').$last_match(1).$to_i(), Opal.const_get_relative($nesting, 'Regexp').$last_match(2)]
           } else {
           return item
         }}, TMP_13.$$s = self, TMP_13.$$arity = 1, TMP_13));

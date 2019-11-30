@@ -2,6 +2,7 @@ import { AfterViewInit, Component, Input, OnDestroy, OnInit } from '@angular/cor
 
 import { EventSystem, Network } from '@udonarium/core/system';
 import { DataElement } from '@udonarium/data-element';
+import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TabletopObject } from '@udonarium/tabletop-object';
 
 import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
@@ -56,6 +57,37 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
     }
   }
 
+  clone() {
+    let cloneObject = this.tabletopObject.clone();
+    cloneObject.location.x += 50;
+    cloneObject.location.y += 50;
+    if (this.tabletopObject.parent) this.tabletopObject.parent.appendChild(cloneObject);
+    cloneObject.update();
+    switch (this.tabletopObject.aliasName) {
+      case 'terrain':
+        SoundEffect.play(PresetSound.blockPut);
+        (cloneObject as any).isLocked = false;
+        break;
+      case 'card':
+      case 'card-stack':
+        (cloneObject as any).owner = '';
+        (cloneObject as any).toTopmost();
+      case 'table-mask':
+        (cloneObject as any).isLock = false;
+        SoundEffect.play(PresetSound.cardPut);
+        break;
+      case 'text-note':
+        (cloneObject as any).toTopmost();
+        SoundEffect.play(PresetSound.cardPut);
+        break;
+      case 'dice-symbol':
+        SoundEffect.play(PresetSound.dicePut);
+      default:
+        SoundEffect.play(PresetSound.piecePut);
+        break;
+    }
+  }
+
   saveToXML() {
     if (!this.tabletopObject) return;
 
@@ -75,7 +107,6 @@ export class GameCharacterSheetComponent implements OnInit, OnDestroy, AfterView
       let element = this.tabletopObject.imageDataElement.getFirstElementByName(name);
       if (!element) return;
       element.value = value;
-      element.update();
     });
   }
 }

@@ -139,26 +139,20 @@ export class AppComponent implements AfterViewInit, OnDestroy {
       .on('DELETE_GAME_OBJECT', event => { this.lazyNgZoneUpdate(event.isSendFromSelf); })
       .on('SYNCHRONIZE_AUDIO_LIST', event => { if (event.isSendFromSelf) this.lazyNgZoneUpdate(false); })
       .on('SYNCHRONIZE_FILE_LIST', event => { if (event.isSendFromSelf) this.lazyNgZoneUpdate(false); })
-      .on<AppConfig>('LOAD_CONFIG', 0, event => {
+      .on<AppConfig>('LOAD_CONFIG', event => {
         console.log('LOAD_CONFIG !!!', event.data);
         Network.setApiKey(event.data.webrtc.key);
         Network.open();
       })
-      .on<File>('FILE_LOADED', 0, event => {
+      .on<File>('FILE_LOADED', event => {
         this.lazyNgZoneUpdate(false);
       })
-      .on('OPEN_PEER', 0, event => {
-        console.log('OPEN_PEER', event.data.peer);
+      .on('OPEN_NETWORK', event => {
+        console.log('OPEN_NETWORK', event.data.peer);
         PeerCursor.myCursor.peerId = event.data.peer;
       })
-      .on('OPEN_OTHER_PEER', event => {
-        if (event.isSendFromSelf) this.chatMessageService.calibrateTimeOffset();
-      })
-      .on('CLOSE_OTHER_PEER', 0, event => {
-        //
-      })
-      .on('LOST_CONNECTION_PEER', 0, event => {
-        console.log('LOST_CONNECTION_PEER', event.data.peer);
+      .on('CLOSE_NETWORK', event => {
+        console.log('CLOSE_NETWORK', event.data.peer);
         this.ngZone.run(async () => {
           if (1 < Network.peerIds.length) {
             await this.modalService.open(TextViewComponent, { title: 'ネットワークエラー', text: 'ネットワーク接続に何らかの異常が発生しました。\nこの表示以後、接続が不安定であれば、ページリロードと再接続を試みてください。' });
@@ -167,13 +161,20 @@ export class AppComponent implements AfterViewInit, OnDestroy {
             Network.open();
           }
         });
+      })
+      .on('CONNECT_PEER', event => {
+        if (event.isSendFromSelf) this.chatMessageService.calibrateTimeOffset();
+      })
+      .on('DISCONNECT_PEER', event => {
+        //
       });
   }
+
   ngAfterViewInit() {
     PanelService.defaultParentViewContainerRef = ModalService.defaultParentViewContainerRef = ContextMenuService.defaultParentViewContainerRef = this.modalLayerViewContainerRef;
     setTimeout(() => {
       this.panelService.open(PeerMenuComponent, { width: 500, height: 450, left: 100 });
-      this.panelService.open(ChatWindowComponent, { width: 700, height: 400, left: 0, top: 450 });
+      this.panelService.open(ChatWindowComponent, { width: 700, height: 400, left: 100, top: 450 });
     }, 0);
   }
 
@@ -217,7 +218,6 @@ export class AppComponent implements AfterViewInit, OnDestroy {
       option.top = (this.openPanelCount % 10 + 1) * 20;
       option.left = 100 + (this.openPanelCount % 20 + 1) * 5;
       this.openPanelCount = this.openPanelCount + 1;
-      console.log('openPanelCount:', this.openPanelCount);
       this.panelService.open(component, option);
     }
   }
@@ -227,6 +227,11 @@ export class AppComponent implements AfterViewInit, OnDestroy {
       ? Network.peerContext.roomName
       : 'ルームデータ';
     this.saveDataService.saveRoom(roomName);
+  }
+
+  handleFileSelect(event: Event) {
+    let files = (<HTMLInputElement>event.target).files;
+    if (files.length) FileArchiver.instance.load(files);
   }
 
   private lazyNgZoneUpdate(isImmediate: boolean) {

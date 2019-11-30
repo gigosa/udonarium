@@ -6,9 +6,7 @@ import {
   Component,
   ElementRef,
   Input,
-  NgZone,
   OnDestroy,
-  OnInit,
   ViewChild,
 } from '@angular/core';
 import { ObjectNode } from '@udonarium/core/synchronize-object/object-node';
@@ -41,8 +39,8 @@ import { PointerDeviceService } from 'service/pointer-device.service';
     ])
   ]
 })
-export class OverviewPanelComponent implements OnInit, OnDestroy, AfterViewInit {
-  @ViewChild('draggablePanel', { static: true }) draggablePanel: ElementRef;
+export class OverviewPanelComponent implements AfterViewInit, OnDestroy {
+  @ViewChild('draggablePanel', { static: true }) draggablePanel: ElementRef<HTMLElement>;
   @Input() tabletopObject: TabletopObject = null;
 
   @Input() left: number = 0;
@@ -62,26 +60,17 @@ export class OverviewPanelComponent implements OnInit, OnDestroy, AfterViewInit 
 
   isOpenImageView: boolean = false;
 
-  private $panel: JQuery;
-
-  private callbackOnScroll = (e) => this.onScroll(e);
-
   constructor(
-    private ngZone: NgZone,
     private inventoryService: GameObjectInventoryService,
     private changeDetector: ChangeDetectorRef,
     private pointerDeviceService: PointerDeviceService
   ) { }
 
-  ngOnInit() { }
-
   ngAfterViewInit() {
-    this.ngZone.runOutsideAngular(() => {
-      this.$panel = $(this.draggablePanel.nativeElement);
-      $(this.draggablePanel.nativeElement).draggable({ containment: 'body', cancel: 'input,textarea,button,select,option,span', opacity: 0.7 });
-      this.initPanelPosition();
-      document.addEventListener('scroll', this.callbackOnScroll, false);
-    });
+    this.initPanelPosition();
+    setTimeout(() => {
+      this.adjustPositionRoot();
+    }, 16);
     EventSystem.register(this)
       .on('UPDATE_GAME_OBJECT', -1000, event => {
         let object = ObjectStore.instance.get(event.data.identifier);
@@ -100,37 +89,12 @@ export class OverviewPanelComponent implements OnInit, OnDestroy, AfterViewInit 
 
   ngOnDestroy() {
     EventSystem.unregister(this);
-    document.removeEventListener('scroll', this.callbackOnScroll, false);
-  }
-
-  private onScroll(e: any) {
-    this.adjustPosition();
-  }
-
-  private adjustPosition() {
-    console.log('adjustPosition');
-    let outerWidth = this.$panel.outerWidth();
-    let outerHeight = this.$panel.outerHeight();
-
-    let offsetLeft = this.$panel.offset().left;
-    let offsetTop = this.$panel.offset().top;
-
-    if (window.innerWidth < offsetLeft + outerWidth) {
-      offsetLeft = window.innerWidth - outerWidth;
-    }
-    if (window.innerHeight < offsetTop + outerHeight) {
-      offsetTop = window.innerHeight - outerHeight;
-    }
-
-    if (offsetLeft < 0) offsetLeft = 0;
-    if (offsetTop < 0) offsetTop = 0;
-
-    this.$panel.offset({ left: offsetLeft, top: offsetTop });
   }
 
   private initPanelPosition() {
-    let outerWidth = this.$panel.outerWidth();
-    let outerHeight = this.$panel.outerHeight();
+    let panel: HTMLElement = this.draggablePanel.nativeElement;
+    let outerWidth = panel.offsetWidth;
+    let outerHeight = panel.offsetHeight;
 
     let offsetLeft = this.left + 100;
     let offsetTop = this.top - outerHeight - 50;
@@ -148,14 +112,41 @@ export class OverviewPanelComponent implements OnInit, OnDestroy, AfterViewInit 
       isCollideTop = true;
     }
 
-    if (isCollideLeft && isCollideTop) {
+    if (isCollideLeft) {
       offsetLeft = this.left - outerWidth - 100;
     }
 
     if (offsetLeft < 0) offsetLeft = 0;
     if (offsetTop < 0) offsetTop = 0;
 
-    this.$panel.offset({ left: offsetLeft, top: offsetTop });
+    panel.style.left = offsetLeft + 'px';
+    panel.style.top = offsetTop + 'px';
+  }
+
+  private adjustPositionRoot() {
+    let panel: HTMLElement = this.draggablePanel.nativeElement;
+
+    let panelBox = panel.getBoundingClientRect();
+
+    let diffLeft = 0;
+    let diffTop = 0;
+
+    if (window.innerWidth < panelBox.right + diffLeft) {
+      diffLeft += window.innerWidth - (panelBox.right + diffLeft);
+    }
+    if (panelBox.left + diffLeft < 0) {
+      diffLeft += 0 - (panelBox.left + diffLeft);
+    }
+
+    if (window.innerHeight < panelBox.bottom + diffTop) {
+      diffTop += window.innerHeight - (panelBox.bottom + diffTop);
+    }
+    if (panelBox.top + diffTop < 0) {
+      diffTop += 0 - (panelBox.top + diffTop);
+    }
+
+    panel.style.left = panel.offsetLeft + diffLeft + 'px';
+    panel.style.top = panel.offsetTop + diffTop + 'px';
   }
 
   chanageImageView(isOpen: boolean) {

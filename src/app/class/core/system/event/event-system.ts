@@ -4,6 +4,8 @@ import { Listener } from './listener';
 import { Callback } from './observer';
 import { Subject } from './subject';
 
+type EventName = string;
+
 export class EventSystem implements Subject {
   private static _instance: EventSystem
   static get instance(): EventSystem {
@@ -14,7 +16,7 @@ export class EventSystem implements Subject {
     return EventSystem._instance;
   }
 
-  private listenersHash: { [eventName: string]: Listener[] } = {};
+  private listenerMap: Map<EventName, Listener[]> = new Map();
   private constructor() {
     console.log('EventSystem ready...');
   }
@@ -43,8 +45,8 @@ export class EventSystem implements Subject {
   }
 
   private _unregister(key: any = this, eventName: string, callback: Callback<any>) {
-    for (let eventName in this.listenersHash) {
-      let listeners = this.getListeners(eventName);
+    let listenersIterator = this.listenerMap.values();
+    for (let listeners of listenersIterator) {
       for (let listener of listeners.concat()) {
         if (listener.isEqual(key, eventName, callback)) {
           listener.unregister();
@@ -57,23 +59,19 @@ export class EventSystem implements Subject {
     let listeners: Listener[] = this.getListeners(listener.eventName);
 
     listeners.push(listener);
-    listeners.sort(function (a, b) {
-      if (a.priority > b.priority) return -1;
-      if (a.priority < b.priority) return 1;
-      return 0;
-    });
+    listeners.sort((a, b) => b.priority - a.priority);
+    this.listenerMap.set(listener.eventName, listeners);
     return listener;
   }
 
   unregisterListener(listener: Listener): Listener {
     let listeners = this.getListeners(listener.eventName);
     let index = listeners.indexOf(listener);
-    if (-1 < index) {
-      listeners.splice(index, 1);
-      listener.unregister();
-      return listener;
-    }
-    return null;
+    if (index < 0) return null;
+    listeners.splice(index, 1);
+    listener.unregister();
+    if (listeners.length < 1) this.listenerMap.delete(listener.eventName);
+    return listener;
   }
 
   call<T>(eventName: string, data: T, sendTo?: string)
@@ -105,45 +103,35 @@ export class EventSystem implements Subject {
   }
 
   private _trigger<T>(event: Event<T>): Event<T> {
-    for (let listener of this.getListeners(event.eventName).concat()) {
-      listener.trigger(event);
-    }
-    for (let listener of this.getListeners('*').concat()) {
+    let listeners = this.getListeners(event.eventName).concat(this.getListeners('*'));
+    for (let listener of listeners) {
       listener.trigger(event);
     }
     return event;
   }
 
   private getListeners(eventName: string): Listener[] {
-    if (!(eventName in this.listenersHash)) {
-      this.listenersHash[eventName] = [];
-    }
-    return this.listenersHash[eventName];
+    return this.listenerMap.has(eventName) ? this.listenerMap.get(eventName) : [];
   }
 
   private initializeNetworkEvent() {
     let callback = Network.instance.callback;
 
-    callback.willOpen = (peerId, sendFrom) => {
-      if (sendFrom !== Network.instance.peerId) {
-        this.sendSystemMessage('Receive <' + peerId + '> connecting...');
-      } else {
-        this.sendSystemMessage('Request <' + peerId + '> connecting...');
-      }
-    }
-
-    callback.onTimeout = (peerId) => {
-      this.sendSystemMessage('timeout peer connection... <' + peerId + '>');
-    }
-
     callback.onOpen = (peerId) => {
-      this.sendSystemMessage('<' + peerId + '> is Open <DataConnection>');
-      if (peerId === Network.instance.peerId) {
-        this.trigger('OPEN_PEER', { peer: peerId });
-      } else {
-        this.trigger('OPEN_OTHER_PEER', { peer: peerId });
-        this.call('OTHER_PEERS', { otherPeers: Network.instance.peerIds });
-      }
+      this.trigger('OPEN_NETWORK', { peer: peerId });
+    }
+    callback.onClose = (peerId) => {
+      this.trigger('CLOSE_NETWORK', { peer: peerId });
+    }
+
+    callback.onConnect = (peerId) => {
+      this.sendSystemMessage('<' + peerId + '> connect <DataConnection>');
+      this.trigger('CONNECT_PEER', { peer: peerId });
+    }
+
+    callback.onDisconnect = (peerId) => {
+      this.sendSystemMessage('<' + peerId + '> disconnect <DataConnection>');
+      this.trigger('DISCONNECT_PEER', { peer: peerId });
     }
 
     callback.onData = (peerId, data: EventContext<never>[]) => {
@@ -152,22 +140,8 @@ export class EventSystem implements Subject {
       }
     }
 
-    callback.onClose = (peerId) => {
-      this.sendSystemMessage('<' + peerId + '> is closed <DataConnection>');
-      if (peerId === Network.instance.peerId) {
-        this.trigger('LOST_CONNECTION_PEER', { peer: peerId });
-      } else {
-        this.trigger('CLOSE_OTHER_PEER', { peer: peerId });
-      }
-    }
-
     callback.onError = (peerId, err) => {
       this.sendSystemMessage('<' + peerId + '> ' + err);
-    }
-
-    callback.onDetectUnknownPeers = (peerIds) => {
-      console.warn('未接続のPeerを確認?', peerIds);
-      this.trigger('OTHER_PEERS', { otherPeers: peerIds });
     }
   }
 
