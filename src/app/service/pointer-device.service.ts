@@ -1,7 +1,5 @@
 import { Injectable, NgZone } from '@angular/core';
 
-import { Transform } from '@udonarium/transform/transform';
-
 export interface PointerCoordinate {
   x: number;
   y: number;
@@ -35,7 +33,12 @@ export class PointerDeviceService {
   get pointerX(): number { return this.primaryPointer.x; }
   get pointerY(): number { return this.primaryPointer.y; }
 
-  isDragging: boolean = false; // todo
+  private _isDragging: boolean = false; // todo
+  get isDragging(): boolean { return this._isDragging; }
+  set isDragging(isDragging: boolean) {
+    if (isDragging === this._isDragging) return;
+    this.ngZone.run(() => this._isDragging = isDragging);
+  }
 
   constructor(private ngZone: NgZone) { }
 
@@ -132,27 +135,5 @@ export class PointerDeviceService {
     document.body.removeEventListener('touchcancel', this.callbackOnPointerUp, true);
     document.body.removeEventListener('drop', this.callbackOnPointerUp, true);
     document.body.removeEventListener('contextmenu', this.callbackOnContextMenu, true);
-  }
-
-  public static convertToLocal(pointer: PointerCoordinate, element: HTMLElement = document.body): PointerCoordinate {
-    let transformer: Transform = new Transform(element);
-    let ray = transformer.globalToLocal(pointer.x, pointer.y, pointer.z ? pointer.z : 0);
-    transformer.clear();
-    return { x: ray.x, y: ray.y, z: ray.z };
-  }
-
-  public static convertToGlobal(pointer: PointerCoordinate, element: HTMLElement = document.body): PointerCoordinate {
-    let transformer: Transform = new Transform(element);
-    let ray = transformer.localToGlobal(pointer.x, pointer.y, pointer.z ? pointer.z : 0);
-    transformer.clear();
-    return { x: ray.x, y: ray.y, z: ray.z };
-  }
-
-  public static convertLocalToLocal(pointer: PointerCoordinate, from: HTMLElement, to: HTMLElement): PointerCoordinate {
-    let transformer: Transform = new Transform(from);
-    let local = transformer.globalToLocal(pointer.x, pointer.y, pointer.z ? pointer.z : 0);
-    let ray = transformer.localToLocal(local.x, local.y, 0, to);
-    transformer.clear();
-    return { x: ray.x, y: ray.y, z: ray.z };
   }
 }

@@ -23,6 +23,7 @@ import { InputHandler } from 'directive/input-handler';
 import { MovableOption } from 'directive/movable.directive';
 import { RotableOption } from 'directive/rotable.directive';
 import { ContextMenuAction, ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
+import { ImageService } from 'service/image.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 
@@ -76,8 +77,7 @@ export class DiceSymbolComponent implements OnInit, AfterViewInit, OnDestroy {
 
   get faces(): string[] { return this.diceSymbol.faces; }
   get imageFile(): ImageFile {
-    let image = this.diceSymbol.imageFile;
-    return image ? image : this.emptyImage;
+    return this.imageService.getEmptyOr(this.diceSymbol.imageFile);
   }
 
   get isMine(): boolean { return this.diceSymbol.isMine; }
@@ -90,7 +90,6 @@ export class DiceSymbolComponent implements OnInit, AfterViewInit, OnDestroy {
   private iconHiddenTimer: NodeJS.Timer = null;
   get isIconHidden(): boolean { return this.iconHiddenTimer != null };
 
-  private emptyImage: ImageFile = ImageFile.Empty;
   gridSize: number = 50;
 
   movableOption: MovableOption = {};
@@ -107,6 +106,7 @@ export class DiceSymbolComponent implements OnInit, AfterViewInit, OnDestroy {
     private contextMenuService: ContextMenuService,
     private elementRef: ElementRef<HTMLElement>,
     private changeDetector: ChangeDetectorRef,
+    private imageService: ImageService,
     private pointerDeviceService: PointerDeviceService) { }
 
   ngOnInit() {
@@ -125,7 +125,7 @@ export class DiceSymbolComponent implements OnInit, AfterViewInit, OnDestroy {
         if (!this.diceSymbol || !object) return;
         if ((this.diceSymbol === object)
           || (object instanceof ObjectNode && this.diceSymbol.contains(object))
-          || (object instanceof PeerCursor && object.peerId === this.diceSymbol.owner)) {
+          || (object instanceof PeerCursor && object.userId === this.diceSymbol.owner)) {
           this.changeDetector.markForCheck();
         }
       })
@@ -136,7 +136,8 @@ export class DiceSymbolComponent implements OnInit, AfterViewInit, OnDestroy {
         this.changeDetector.markForCheck();
       })
       .on('DISCONNECT_PEER', event => {
-        if (this.diceSymbol.owner === event.data.peer) this.changeDetector.markForCheck();
+        let cursor = PeerCursor.findByPeerId(event.data.peerId);
+        if (!cursor || this.diceSymbol.owner === cursor.userId) this.changeDetector.markForCheck();
       });
     this.movableOption = {
       tabletopObject: this.diceSymbol,
@@ -149,8 +150,10 @@ export class DiceSymbolComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit() {
-    this.input = new InputHandler(this.elementRef.nativeElement);
-    this.input.onStart = this.onInputStart.bind(this);
+    this.ngZone.runOutsideAngular(() => {
+      this.input = new InputHandler(this.elementRef.nativeElement);
+    });
+    this.input.onStart = e => this.ngZone.run(() => this.onInputStart(e));
   }
 
   ngOnDestroy() {
@@ -171,7 +174,7 @@ export class DiceSymbolComponent implements OnInit, AfterViewInit, OnDestroy {
 
   onInputStart(e: MouseEvent | TouchEvent) {
     this.startDoubleClickTimer(e);
-    if (e instanceof MouseEvent) this.startIconHiddenTimer();
+    this.startIconHiddenTimer();
   }
 
   startDoubleClickTimer(e) {
@@ -232,7 +235,7 @@ export class DiceSymbolComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!this.isMine) {
       actions.push({
         name: '自分だけ見る', action: () => {
-          this.owner = Network.peerId;
+          this.owner = Network.peerContext.userId;
           SoundEffect.play(PresetSound.lock);
         }
       });

@@ -3,7 +3,7 @@ import { Injectable } from '@angular/core';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { Database } from '@udonarium/database/database';
 
-import * as yaml from 'js-yaml/dist/js-yaml.min.js';
+import * as yaml from 'js-yaml';
 
 export interface AppConfig {
   webrtc: {
@@ -18,6 +18,9 @@ export interface AppConfig {
     mode: string
   }
 }
+
+const objectPropertyKeys = Object.getOwnPropertyNames(Object.prototype);
+const arrayPropertyKeys = Object.getOwnPropertyNames(Array.prototype);
 
 @Injectable()
 export class AppConfigService {
@@ -91,9 +94,8 @@ export class AppConfigService {
     try {
       console.log('YAML読み込み...');
       let config = await this.loadYaml();
-      let obj = yaml.safeLoad(config);
+      let obj = yaml.load(config);
       AppConfigService.applyConfig(obj);
-      console.log(AppConfigService.appConfig);
     } catch (e) {
       console.warn(e);
     }
@@ -109,7 +111,6 @@ export class AppConfigService {
         return;
       }
 
-      console.log('loadYaml ready...', config);
       let configString = config.textContent;
       let url = config.getAttribute('src');
 
@@ -143,20 +144,20 @@ export class AppConfigService {
   }
 
   private static applyConfig(config: Object, root: Object = AppConfigService.appConfig): Object {
-    for (let key in config) {
-      if (isArray(config[key])) {
-        root[key] = config[key];
-      } else if (typeof config[key] === 'object') {
-        if (!(key in root)) root[key] = {};
+    if (config == null) return root;
+    let keys = Object.getOwnPropertyNames(config);
+    for (let key of keys) {
+      let invalidPropertyKeys = Array.isArray(config) || Array.isArray(root) ? objectPropertyKeys.concat(arrayPropertyKeys) : objectPropertyKeys;
+      if (invalidPropertyKeys.includes(key)) {
+        console.log(`skip invalid key (${key})`);
+        continue;
+      } else if (config[key] != null && typeof config[key] === 'object') {
+        if (root[key] == null) root[key] = Array.isArray(config[key]) ? [] : {};
         AppConfigService.applyConfig(config[key], root[key]);
-      } else {
+      } else if (typeof config[key] !== 'function' && typeof root[key] !== 'function') {
         root[key] = config[key];
       }
     }
     return root;
   }
-}
-
-function isArray(obj) {
-  return Object.prototype.toString.call(obj) === '[object Array]';
 }

@@ -1,10 +1,12 @@
 import { AfterViewInit, Component, ElementRef, Input, NgZone, OnDestroy, OnInit, ViewChild } from '@angular/core';
 
 import { EventSystem, Network } from '@udonarium/core/system';
+import { ResettableTimeout } from '@udonarium/core/system/util/resettable-timeout';
 import { PeerCursor } from '@udonarium/peer-cursor';
 
-import { PointerCoordinate, PointerDeviceService } from 'service/pointer-device.service';
-import { TabletopService } from 'service/tabletop.service';
+import { BatchService } from 'service/batch.service';
+import { CoordinateService } from 'service/coordinate.service';
+import { PointerCoordinate } from 'service/pointer-device.service';
 
 @Component({
   selector: 'peer-cursor, [peer-cursor]',
@@ -23,7 +25,7 @@ export class PeerCursorComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private cursorElement: HTMLElement = null;
   private opacityElement: HTMLElement = null;
-  private fadeOutTimer: NodeJS.Timer = null;
+  private fadeOutTimer: ResettableTimeout = null;
 
   private updateInterval: NodeJS.Timer = null;
   private callcack: any = (e) => this.onMouseMove(e);
@@ -38,7 +40,8 @@ export class PeerCursorComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   constructor(
-    private tabletopService: TabletopService,
+    private batchService: BatchService,
+    private coordinateService: CoordinateService,
     private ngZone: NgZone
   ) { }
 
@@ -47,7 +50,7 @@ export class PeerCursorComponent implements OnInit, AfterViewInit, OnDestroy {
       EventSystem.register(this)
         .on('CURSOR_MOVE', event => {
           if (event.sendFrom !== this.cursor.peerId) return;
-          this.tabletopService.addBatch(() => {
+          this.batchService.add(() => {
             this.stopTransition();
             this.setAnimatedTransition();
             this.setPosition(event.data[0], event.data[1], event.data[2]);
@@ -76,7 +79,8 @@ export class PeerCursorComponent implements OnInit, AfterViewInit, OnDestroy {
     document.body.removeEventListener('mousemove', this.callcack);
     document.body.removeEventListener('touchmove', this.callcack);
     EventSystem.unregister(this);
-    this.tabletopService.removeBatch(this);
+    this.batchService.remove(this);
+    if (this.fadeOutTimer) this.fadeOutTimer.clear();
   }
 
   private onMouseMove(e: any) {
@@ -97,24 +101,20 @@ export class PeerCursorComponent implements OnInit, AfterViewInit, OnDestroy {
   private calcLocalCoordinate(x: number, y: number, target: HTMLElement) {
     if (!document.getElementById('app-table-layer').contains(target)) return;
 
-    let dragArea = document.getElementById('app-game-table');
     let coordinate: PointerCoordinate = { x: x, y: y, z: 0 };
-    if (target.contains(dragArea)) {
-      coordinate = PointerDeviceService.convertToLocal(coordinate, dragArea);
-      coordinate.z = 0;
-    } else {
-      coordinate = PointerDeviceService.convertLocalToLocal(coordinate, target, dragArea);
-    }
+    coordinate = this.coordinateService.calcTabletopLocalCoordinate(coordinate, target);
 
     EventSystem.call('CURSOR_MOVE', [coordinate.x, coordinate.y, coordinate.z]);
   }
 
   private resetFadeOut() {
     this.opacityElement.style.opacity = '1.0';
-    clearTimeout(this.fadeOutTimer);
-    this.fadeOutTimer = setTimeout(() => {
-      this.opacityElement.style.opacity = '0.0';
-    }, 3000);
+    if (this.fadeOutTimer == null) {
+      this.fadeOutTimer = new ResettableTimeout(() => {
+        this.opacityElement.style.opacity = '0.0';
+      }, 3000);
+    }
+    this.fadeOutTimer.reset();
   }
 
   private stopTransition() {

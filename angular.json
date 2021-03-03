@@ -1,5 +1,8 @@
 {
   "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
+  "cli": {
+    "analytics": "18b1695b-47dc-42a0-a9db-3288e12b6db5"
+  },
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
@@ -26,7 +29,16 @@
             "styles": [
               "src/styles.css"
             ],
-            "scripts": []
+            "scripts": [],
+            "allowedCommonJsDependencies": [
+              "hammerjs",
+              "crypto-js/sha256",
+              "crypto-js/lib-typedarrays",
+              "file-saver",
+              "msgpack-lite",
+              "lzbase62",
+              "pako"
+            ]
           },
           "configurations": {
             "production": {
@@ -39,7 +51,6 @@
               "optimization": true,
               "outputHashing": "all",
               "sourceMap": false,
-              "extractCss": true,
               "namedChunks": false,
               "extractLicenses": true,
               "vendorChunk": false,
