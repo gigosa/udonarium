@@ -75,7 +75,7 @@
   height: 100%;
   width: 100%;
   box-sizing: border-box;
-  border: solid 6px rgb(216, 139, 75);
+  border: solid 6px rgba(247, 247, 247, 0.9);
   border-radius: 5px;
 }
 

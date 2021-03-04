@@ -46,7 +46,7 @@ export class TabletopActionService {
   }
 
   createTerrain(position: PointerCoordinate): Terrain {
-    let url: string = './assets/images/tex.jpg';
+    let url: string = './assets/images/skeleton.png';
     let image: ImageFile = ImageStorage.instance.get(url)
     if (!image) image = ImageStorage.instance.add(url);
 
